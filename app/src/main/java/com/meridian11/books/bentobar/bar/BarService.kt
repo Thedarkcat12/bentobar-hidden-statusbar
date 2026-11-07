@@ -324,7 +324,8 @@ class BarController(private val service: AccessibilityService) {
         val barBounds = barWindow?.let { Rect().also { r -> it.getBoundsInScreen(r) } }
         val prev = snap
         val s = when {
-            barWindow == null -> null
+            // No status bar window (a tablet's PC mode has a taskbar instead): float along the top of the screen.
+            barWindow == null -> floatingSnapshot(windows, screenW, metrics.bounds.height(), inset)
             !full && prev != null && prev.windowId == barWindow.id && prev.bar == barBounds -> prev
             else -> {
                 lastFullScan = SystemClock.uptimeMillis()
@@ -384,6 +385,35 @@ class BarController(private val service: AccessibilityService) {
             Ticker.stop("bar")
         }
     }
+
+    /**
+     * With no status bar window (a tablet's PC mode keeps its clock and icons in a taskbar) the strip floats
+     * along the top of the screen: a "bar" as tall as the status bar would be, whose free stretch is what no
+     * window's caption takes ([FloatingBand]). Null, as with no bar before: the user turned floating off, or an
+     * app is full screen (no taskbar showing and a window over the whole display), where the strip would sit on
+     * the app's own content.
+     */
+    private fun floatingSnapshot(windows: List<AccessibilityWindowInfo>, screenW: Int, screenH: Int, inset: Int): BarSnapshot? {
+        val cfg = Store.config.value
+        if (!cfg.floatWithoutBar) return null
+        fun boxes(type: Int) = windows.filter { it.type == type }
+            .map { w -> Rect().also { w.getBoundsInScreen(it) }.let { AppWindow(w.id, it.left, it.top, it.right, it.bottom) } }
+        val apps = boxes(AccessibilityWindowInfo.TYPE_APPLICATION)
+        if (!FloatingBand.hasTaskbar(boxes(AccessibilityWindowInfo.TYPE_SYSTEM), screenW, screenH) && FloatingBand.coversDisplay(apps, screenW, screenH)) {
+            floatNote("hidden: an app covers the display and no taskbar shows")
+            return null
+        }
+        val h = if (inset > 0) inset else (FLOAT_HEIGHT_DP * density).toInt()
+        val free = FloatingBand.free(apps, screenW, h, (FLOAT_EDGE_DP * density).toInt(),
+            (cfg.floatTitleDp * density).toInt(), (cfg.floatControlsDp * density).toInt())
+        val caption = apps.any { it.top < h && it.bottom > 0 }
+        floatNote("free=${free.left}..${free.right} h=$h windows=${apps.size} caption=$caption")
+        return BarSnapshot(FLOATING_ID, Rect(0, 0, screenW, h), Rect(free.left, 0, free.right, h), null, if (caption) FLOAT_CAPTION else FLOAT_DESKTOP)
+    }
+
+    private var lastFloatNote = ""
+    /** What floating decided, logged when it changes (a look at the windows runs every two seconds). */
+    private fun floatNote(what: String) { if (what != lastFloatNote) { lastFloatNote = what; Log.i(tag, "floating $what") } }
 
     /** adb `debug trace on|off`: logs every move and resize with its cause, to chase jitter. */
     private var tracing = false
@@ -470,6 +500,8 @@ class BarController(private val service: AccessibilityService) {
         if (stripEmpty) return watch.pause()
         val s = snap
         if (s == null || Store.config.value.color != ColorMode.AUTO) { watch.clear(); return applyLook() }
+        // Floating has no status bar window to take a picture of: the theme and wallpaper decide (fallbackText).
+        if (s.windowId == FLOATING_ID) { watch.clear(); sampled = null; return applyLook() }
         watch.taken(SystemClock.uptimeMillis())
         service.takeScreenshotOfWindow(s.windowId, callbacks, object : AccessibilityService.TakeScreenshotCallback {
             override fun onSuccess(r: AccessibilityService.ScreenshotResult) {
@@ -524,6 +556,8 @@ class BarController(private val service: AccessibilityService) {
     private fun fallbackText(): Color {
         val night = (service.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
         if (night) return Color.White
+        // Floating over a window's caption: the caption takes the theme's colours, not the wallpaper's.
+        if (snap?.summary == FLOAT_CAPTION) return Contrast.DARK_TEXT
         val hints = runCatching { WallpaperManager.getInstance(service).getWallpaperColors(WallpaperManager.FLAG_SYSTEM)?.colorHints }.getOrNull() ?: 0
         return if (hints and android.app.WallpaperColors.HINT_SUPPORTS_DARK_TEXT != 0) Contrast.DARK_TEXT else Color.White
     }
@@ -977,6 +1011,15 @@ class BarController(private val service: AccessibilityService) {
 
     companion object {
         private const val TOOLTIP_MAX_DP = 360
+        /** The window id of a floating strip's "bar" ([floatingSnapshot]): no real window has it, so no screenshot is asked of it. */
+        private const val FLOATING_ID = -1
+        /** How tall the floating strip is when Android gives no status bar height (a window caption is about this tall). */
+        private const val FLOAT_HEIGHT_DP = 40
+        /** The gap kept from the screen's sides while floating. */
+        private const val FLOAT_EDGE_DP = 16
+        /** [BarSnapshot.summary] of a floating strip: over a window's caption, or over the bare desktop. */
+        private const val FLOAT_CAPTION = "floating:caption"
+        private const val FLOAT_DESKTOP = "floating:desktop"
         private const val RELEVANT = AccessibilityEvent.WINDOWS_CHANGE_ADDED or AccessibilityEvent.WINDOWS_CHANGE_REMOVED or
             AccessibilityEvent.WINDOWS_CHANGE_BOUNDS
     }

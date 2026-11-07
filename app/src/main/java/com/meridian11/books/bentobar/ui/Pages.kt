@@ -167,6 +167,14 @@ fun LookPage() {
             Position.CENTER to stringResource(R.string.look_position_center), Position.LEFT to stringResource(R.string.look_position_left)),
             cfg.position) { p -> Store.update { it.copy(position = p) } }
         SliderRow(stringResource(R.string.look_spacing), cfg.spacing, 0..24, { "$it dp" }) { v -> Store.update { it.copy(spacing = v) } }
+        SwitchRow(stringResource(R.string.floating_switch), cfg.floatWithoutBar, help = stringResource(R.string.floating_switch_help)) { on ->
+            Store.update { it.copy(floatWithoutBar = on) }
+        }
+        if (cfg.floatWithoutBar) {
+            // Where a window's title bar ends and its buttons begin: the system draws them, so the strip is told how much to leave.
+            SliderRow(stringResource(R.string.floating_title), cfg.floatTitleDp, 0..400, { "$it dp" }) { v -> Store.update { it.copy(floatTitleDp = v) } }
+            SliderRow(stringResource(R.string.floating_controls), cfg.floatControlsDp, 80..400, { "$it dp" }) { v -> Store.update { it.copy(floatControlsDp = v) } }
+        }
         SwitchRow(stringResource(R.string.look_presenting), cfg.presenting, help = stringResource(R.string.look_presenting_help)) { on ->
             Store.update { it.copy(presenting = on) }
         }

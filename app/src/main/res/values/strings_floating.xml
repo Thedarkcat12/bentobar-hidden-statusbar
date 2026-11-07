@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Floating without a status bar (a tablet's PC mode). Every name here starts with floating_. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
+    <string name="floating_switch">Stay on screen without a status bar</string>
+    <string name="floating_switch_help">In PC mode the clock and icons move to a taskbar. BentoBar then floats along the top of the screen, beside each window\'s title bar, and still hides for full-screen apps.</string>
+    <string name="floating_title">Keep clear at a window\'s left</string>
+    <string name="floating_controls">Keep clear at a window\'s right</string>
+</resources>

@@ -108,6 +108,16 @@ data class BarConfig(
     /** "Tint with system colors": the popups' glass takes a tint of the system's (wallpaper's) palette. Off: neutral glass. */
     val systemTint: Boolean = false,
     /**
+     * With no status bar at all (a tablet's PC mode keeps its clock and icons in a taskbar), float along the
+     * top of the screen instead of going away. Full-screen apps still hide it. Off by default: where a device keeps
+     * a taskbar while an app is full screen, the strip would stay over that app, as it never did.
+     */
+    val floatWithoutBar: Boolean = false,
+    /** Floating: dp kept clear at the left end of a window's caption (its icon and name). */
+    val floatTitleDp: Int = 200,
+    /** Floating: dp kept clear at the right end of a window's caption (its buttons, with room for one more). */
+    val floatControlsDp: Int = 220,
+    /**
      * Mirror the running timer or next meeting as an Android Live Update chip: FALLBACK only
      * while BentoBar's own bar isn't showing (accessibility off, or hidden with the tile).
      */
