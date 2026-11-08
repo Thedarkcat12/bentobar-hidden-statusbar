@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Material 3's wavy style for progress bars. Every name here starts with wavy_. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
+    <string name="wavy_bars">Wavy progress bars</string>
+    <string name="wavy_bars_help">Progress bars in the popups and in Now playing\'s bar item are drawn as Material 3\'s moving waves. The volume slider stays as it is.</string>
+</resources>

@@ -57,16 +57,16 @@ data class ItemConfig(
  * These items with [id] moved into [section] at [index] among that section's other items (the end
  * if out of range). Unchanged if [id] isn't there. [Store.move] and the drag preview both use it.
  */
-fun List<ItemConfig>.moved(id: String, section: Section, index: Int): List<ItemConfig> {
+fun List<ItemConfig>.moved(id: String, section: Section, index: Int, desktop: Boolean = false): List<ItemConfig> {
     val item = firstOrNull { it.id == id } ?: return this
     val rest = filterNot { it.id == id }
-    val inSection = rest.withIndex().filter { it.value.section == section }
+    val inSection = rest.withIndex().filter { it.value.sectionIn(desktop) == section }
     val at = when {
         inSection.isEmpty() -> rest.size
         index >= inSection.size -> inSection.last().index + 1
         else -> inSection[index.coerceAtLeast(0)].index
     }
-    return rest.toMutableList().apply { add(at, item.copy(section = section)) }
+    return rest.toMutableList().apply { add(at, item.placedIn(section, desktop)) }
 }
 
 /**
@@ -109,6 +109,8 @@ data class BarConfig(
     val noAnimations: Boolean = false,
     /** "Tint with system colors": the popups' glass takes a tint of the system's (wallpaper's) palette. Off: neutral glass. */
     val systemTint: Boolean = false,
+    /** The progress bars (except the volume one) are drawn in Material 3's wavy style. */
+    val wavyBars: Boolean = false,
     /** How solid the popups are, in percent: 50 is the look they were made with, 100 a solid card, less lets more of the screen show through. */
     val popupOpaque: Int = DEFAULT_POPUP_OPAQUE,
     /**
@@ -126,6 +128,10 @@ data class BarConfig(
     val desktopAlign: DesktopAlign = DesktopAlign.SAME,
     /** Desktop Mode: when the strip doesn't fit beside a window's buttons, cover the icon and name instead of dropping items. */
     val desktopOverlap: Boolean = false,
+    /** Desktop Mode: dp between the screen's left or right edge and the strip (its pill, or its items without one) when it sits at an edge. */
+    val desktopEdgeDp: Int = 0,
+    /** Desktop Mode: the strip steps aside while a window is maximized (fills the screen above the taskbar), where an app's own top bar would lie under it. */
+    val desktopHideMaximized: Boolean = false,
     /** How far below the top of the screen the strip sits, in dp. */
     val offsetYDp: Int = 0,
     /** The same, while Desktop Mode is active. */
@@ -170,6 +176,15 @@ enum class HiddenMode { SHOW_ALL, CLICK, HOVER }
 /** An item's own place while Desktop Mode is active. */
 @Serializable
 enum class DesktopWhere { SAME, SHOWN, HIDDEN, OFF }
+
+/** The section this item is in as the Bar page shows it: its Desktop Mode place in the Desktop Mode view, else [ItemConfig.section]. */
+fun ItemConfig.sectionIn(desktop: Boolean): Section = if (!desktop) section else when (this.desktop) {
+    DesktopWhere.SAME -> section; DesktopWhere.SHOWN -> Section.SHOWN; DesktopWhere.HIDDEN -> Section.HIDDEN; DesktopWhere.OFF -> Section.OFF
+}
+
+/** This item put in [section] as that view shows it: the Desktop Mode view sets its Desktop Mode place (back to Same as usual when that is its usual one). */
+fun ItemConfig.placedIn(section: Section, desktop: Boolean): ItemConfig = if (!desktop) copy(section = section) else copy(desktop =
+    if (section == this.section) DesktopWhere.SAME else when (section) { Section.SHOWN -> DesktopWhere.SHOWN; Section.HIDDEN -> DesktopWhere.HIDDEN; Section.OFF -> DesktopWhere.OFF })
 
 /** The section this item is in right now: its own while Desktop Mode is active and it has one, else [ItemConfig.section]. */
 val ItemConfig.sectionNow: Section get() = when {
@@ -217,6 +232,9 @@ fun popupAlpha(base: Float, percent: Int): Float {
 
 /** The most the strip can be moved down, in dp. */
 const val MAX_OFFSET_Y_DP = 64
+
+/** The most room that can be kept between the strip and the screen's side in Desktop Mode, in dp. */
+const val MAX_EDGE_DP = 64
 
 /**
  * Version 3 replaced the ‹ switch and "reveal on hover" with [HiddenMode]. With ‹ off, a hidden

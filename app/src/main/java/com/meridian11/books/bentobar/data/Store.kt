@@ -115,7 +115,7 @@ object Store {
     fun remove(id: String) = update { c -> c.copy(items = c.items.filterNot { it.id == id }) }
 
     /** Moves [id] into [section] at [index] within that section (end if out of range). */
-    fun move(id: String, section: Section, index: Int) = update { c -> c.copy(items = c.items.moved(id, section, index)) }
+    fun move(id: String, section: Section, index: Int, desktop: Boolean = false) = update { c -> c.copy(items = c.items.moved(id, section, index, desktop)) }
 
     fun newId(): String = UUID.randomUUID().toString().substring(0, 8)
 

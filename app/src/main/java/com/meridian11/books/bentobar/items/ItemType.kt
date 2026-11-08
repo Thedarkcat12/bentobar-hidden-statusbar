@@ -31,6 +31,19 @@ data class BarSlider(
 )
 
 /**
+ * A progress bar drawn in the bar beside an item's icon, with its text still after it (Now playing's). With [seekable]
+ * a drag on it reports a level ([ItemType.onSlide], on release); without, it only shows.
+ */
+@androidx.compose.runtime.Immutable
+data class BarProgress(
+    /** How far along, 0 to 1. */
+    val level: Float,
+    val seekable: Boolean = true,
+    /** The fill's color as ARGB (a cover's), or 0 for the bar's own. */
+    val tint: Int = 0,
+)
+
+/**
  * A route line drawn in the bar in the icon's place (the Flight item's, while its flight is near or
  * under way): the slider's line with a plane on it. Not a control: the strip only draws it, and the
  * item says where the plane stands and how the flight does.
@@ -96,8 +109,8 @@ data class ItemState(
      * changes. Null: none.
      */
     val turns: List<String>? = null,
-    /** A small wavy line beside the icon, moving while music plays (Now playing's option). */
-    val wave: Boolean = false,
+    /** A progress bar beside the icon (Now playing's option): where the track stands, and a way to move it. Null: none. */
+    val progress: BarProgress? = null,
 ) {
     /** For logs and dumps: never the words themselves, which can be a track's title, a city or a flight. */
     override fun toString() = "ItemState(icon=${icon != null}, text of ${text?.length ?: 0}, active=$active, tone=$tone)"

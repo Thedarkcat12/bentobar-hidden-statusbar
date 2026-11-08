@@ -1,7 +1,6 @@
 package com.meridian11.books.bentobar.bar
 
 import android.graphics.Rect
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -28,6 +27,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.MotionDurationScale
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -93,6 +94,7 @@ import com.meridian11.books.bentobar.data.ItemConfig
 import com.meridian11.books.bentobar.data.Pill
 import com.meridian11.books.bentobar.data.TextSize
 import com.meridian11.books.bentobar.items.BarRoute
+import com.meridian11.books.bentobar.items.BarProgress
 import com.meridian11.books.bentobar.items.BarSlider
 import com.meridian11.books.bentobar.items.ItemState
 import com.meridian11.books.bentobar.items.Stands
@@ -565,8 +567,11 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, gl
     val route = s.route?.takeIf { display.line }
     // While the pointer holds the slider: the level under it. Otherwise the item's own, which is the real one.
     var held by remember { mutableStateOf<Float?>(null) }
+    // The same for a progress bar beside the icon (Now playing's).
+    var heldP by remember { mutableStateOf<Float?>(null) }
+    val progress = s.progress?.takeIf { display != Display.TEXT }
     // A held slider keeps the strip's highlight on its item, wherever the pointer goes, until it lets go.
-    val sliding = held != null
+    val sliding = held != null || heldP != null
     DisposableEffect(sliding) {
         if (sliding) glow.pin(entry.item.id, true)
         onDispose { if (sliding) glow.pin(entry.item.id, false) }
@@ -659,9 +664,11 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, gl
                 SymIcon(s.icon, size = look.iconSp, filled = s.filled, color = color)
             }
         }
-        if (s.wave && showIcon) {
-            Spacer(Modifier.width(4.dp))
-            WaveLine(color, look.iconSp.value.dp)
+        if (progress != null && showIcon) {
+            Spacer(Modifier.width(5.dp))
+            ProgressTrack(progress, heldP, look, rtl, com.meridian11.books.bentobar.data.Store.config.collectAsState().value.wavyBars,
+                modifier = if (!events.slidable || !progress.seekable) Modifier
+                else Modifier.slides(0, rtl, onHeld = { heldP = it }, onContext = { context() }) { level, done -> events.slide(entry.item, level, done) })
         }
         if (showIcon && (showText || slider != null) && (s.image != null || !s.icon.isNullOrEmpty())) Spacer(Modifier.width(5.dp))
         if (slider != null) {
@@ -686,32 +693,18 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, gl
 }
 
 /**
- * Now playing's wavy line: a small sine that travels while music plays, [height] tall and a little wider. With
- * "No animations" (or the system's Remove animations) it stands still.
+ * Now playing's progress bar, beside the icon: a track [SLIDER_TRACK] wide, plain or in Material 3's wavy style, filled to
+ * how far the track has played, in the cover's color when the item asks. While the pointer holds it ([held]) the level
+ * under the pointer is drawn. The pointer rules are [slides]'s, on this composable's own zone.
  */
 @Composable
-private fun WaveLine(color: Color, height: Dp) {
-    val moving = !Motion.off
-    // Standing still, nothing runs: no frame is asked for.
-    val travel: androidx.compose.runtime.State<Float> = if (moving) androidx.compose.animation.core.rememberInfiniteTransition(label = "wave").animateFloat(
-        0f, 1f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1400, easing = androidx.compose.animation.core.LinearEasing)),
-        label = "travel") else remember { mutableStateOf(0f) }
-    Canvas(Modifier.size(width = height * 1.4f, height = height)) {
-        val stroke = 1.6.dp.toPx()
-        val mid = size.height / 2
-        val amp = (size.height / 2 - stroke).coerceAtLeast(1f)
-        val shift = if (moving) travel.value * 2f * Math.PI.toFloat() else 0f
-        val path = androidx.compose.ui.graphics.Path()
-        val steps = 24
-        for (i in 0..steps) {
-            val x = size.width * i / steps
-            // One and a half waves across, fading in from the left so the ends don't bunch against the icon and the words.
-            val edge = kotlin.math.sin(Math.PI.toFloat() * i / steps)
-            val y = mid + amp * edge * kotlin.math.sin(3f * Math.PI.toFloat() * i / steps - shift)
-            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-        }
-        drawPath(path, color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round,
-            join = androidx.compose.ui.graphics.StrokeJoin.Round))
+private fun ProgressTrack(progress: BarProgress, held: Float?, look: StripLook, rtl: Boolean, wavy: Boolean, modifier: Modifier) {
+    val fg = look.fg
+    val onDark = com.meridian11.books.bentobar.items.ArtColor.luminance(fg.toArgb()) > 0.5f
+    val fill = if (progress.tint != 0) Color(com.meridian11.books.bentobar.items.ArtColor.forBackground(progress.tint, onDark)) else fg
+    Box(modifier.width(SLIDER_TRACK).fillMaxHeight(), contentAlignment = Alignment.Center) {
+        com.meridian11.books.bentobar.ui.WavyTrack(held ?: progress.level, fill, look.sliderTrack,
+            Modifier.fillMaxWidth().height(12.dp).graphicsLayer { scaleX = if (rtl) -1f else 1f }, wavy = wavy)
     }
 }
 

@@ -7,9 +7,11 @@ import org.junit.Test
 class MediaOptionsTest {
     @Test fun albumArtAndTheWaveAreOffUntilChosen() {
         assertFalse(MediaText.art(emptyMap()))
-        assertFalse(MediaText.wave(emptyMap()))
+        assertFalse(MediaText.progress(emptyMap()))
+        assertFalse(MediaText.artColor(emptyMap()))
         assertTrue(MediaText.art(mapOf(MediaText.OPTION_ART to "true")))
-        assertTrue(MediaText.wave(mapOf(MediaText.OPTION_WAVE to "true")))
+        assertTrue(MediaText.progress(mapOf(MediaText.OPTION_PROGRESS to "true")))
+        assertTrue(MediaText.artColor(mapOf(MediaText.OPTION_ART_COLOR to "true")))
         assertFalse(MediaText.art(mapOf(MediaText.OPTION_ART to "false")))
     }
 }

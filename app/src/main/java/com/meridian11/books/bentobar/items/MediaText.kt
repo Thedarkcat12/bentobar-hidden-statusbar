@@ -33,9 +33,10 @@ object MediaText {
     const val OPTION_SHOW = "show"
     const val OPTION_CHARS = "maxChars"
     const val OPTION_CLICK = "click"
-    /** "Album art as the icon" (default off) and "Wavy line while playing" (default off): the strings "true" and "false". */
+    /** "Album art as the icon", "Progress bar" and "Color from the album art" (each default off): the strings "true" and "false". */
     const val OPTION_ART = "art"
-    const val OPTION_WAVE = "wave"
+    const val OPTION_PROGRESS = "progress"
+    const val OPTION_ART_COLOR = "artColor"
     const val OPTION_LINGER = "lingerMin"
     const val CLICK_MENU = "menu"
     const val CLICK_TOGGLE = "toggle"
@@ -59,7 +60,8 @@ object MediaText {
 
     /** "A click: Plays or pauses", instead of opening the menu. */
     fun art(options: Map<String, String>): Boolean = options[OPTION_ART] == "true"
-    fun wave(options: Map<String, String>): Boolean = options[OPTION_WAVE] == "true"
+    fun progress(options: Map<String, String>): Boolean = options[OPTION_PROGRESS] == "true"
+    fun artColor(options: Map<String, String>): Boolean = options[OPTION_ART_COLOR] == "true"
 
     fun toggles(options: Map<String, String>): Boolean = options[OPTION_CLICK] == CLICK_TOGGLE
 

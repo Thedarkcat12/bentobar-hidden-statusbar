@@ -98,6 +98,7 @@ import com.meridian11.books.bentobar.data.ItemConfig
 import com.meridian11.books.bentobar.data.Position
 import com.meridian11.books.bentobar.data.DesktopWhere
 import com.meridian11.books.bentobar.data.Section
+import com.meridian11.books.bentobar.data.sectionIn
 import com.meridian11.books.bentobar.data.shows
 import com.meridian11.books.bentobar.data.behindChevron
 import com.meridian11.books.bentobar.data.HiddenMode
@@ -119,6 +120,7 @@ fun BarPage(running: Boolean, selected: String?, onSelect: (String?) -> Unit, on
     val snackbar = remember { SnackbarHostState() }
     val deleted by Undo.deleted.collectAsState()
     val res = androidx.compose.ui.platform.LocalResources.current
+    var desktopView by remember { mutableStateOf(false) }
     LaunchedEffect(deleted) {
         val d = deleted ?: return@LaunchedEffect
         val name = Items.of(d.item.type)?.title ?: res.getString(R.string.bar_deleted_fallback)
@@ -138,7 +140,7 @@ fun BarPage(running: Boolean, selected: String?, onSelect: (String?) -> Unit, on
             if (wide) {
                 Row(Modifier.weight(1f)) {
                     Column(Modifier.width(470.dp).fillMaxHeight().verticalScroll(listScroll)) {
-                        Sections(cfg.items, states, selected, onSelect, listScroll)
+                        Sections(cfg.items, states, selected, onSelect, listScroll, desktopView && cfg.floatWithoutBar) { desktopView = it }
                     }
                     Spacer(Modifier.width(20.dp))
                     Box(Modifier.weight(1f).fillMaxHeight()) {
@@ -151,7 +153,7 @@ fun BarPage(running: Boolean, selected: String?, onSelect: (String?) -> Unit, on
                     if (item != null) {
                         TextButton(onClick = { onSelect(null) }) { SymIcon(Sym.ARROW_BACK, size = 18.sp); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.bar_all_items)) }
                         ItemDetail(item, states[item.id], onSelect)
-                    } else Sections(cfg.items, states, selected, onSelect, listScroll)
+                    } else Sections(cfg.items, states, selected, onSelect, listScroll, desktopView && cfg.floatWithoutBar) { desktopView = it }
                 }
             }
         }
@@ -262,11 +264,12 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
 }
 
 @Composable
-private fun Sections(items: List<ItemConfig>, states: Map<String, ItemState>, selected: String?, onSelect: (String?) -> Unit, scroll: ScrollState) {
+private fun Sections(items: List<ItemConfig>, states: Map<String, ItemState>, selected: String?, onSelect: (String?) -> Unit, scroll: ScrollState,
+                     desktop: Boolean, onDesktop: (Boolean) -> Unit) {
     val cfg by Store.config.collectAsState()
     val reorder = remember { Reorder() }
     val scope = rememberCoroutineScope()
-    SideEffect { reorder.items = items }
+    SideEffect { reorder.items = items; reorder.desktop = desktop }
     // The Store's new order has arrived (or something else changed it): stop previewing the drop.
     LaunchedEffect(items) { reorder.pending = null }
     // While dragging: scroll when the pointer nears the top or bottom edge, and keep the opening under it.
@@ -294,11 +297,14 @@ private fun Sections(items: List<ItemConfig>, states: Map<String, ItemState>, se
     Box(Modifier.fillMaxWidth().onGloballyPositioned { reorder.container = it }.reorderable(reorder, scope)
         .pointerHoverIcon(if (reorder.dragging != null) grabbing else PointerIcon.Default, overrideDescendants = reorder.dragging != null)) {
         Column {
-            SectionCard(Section.SHOWN, stringResource(R.string.section_shown), stringResource(R.string.section_shown_help), order, states, selected, onSelect, reorder)
+            // With Desktop Mode on, the same cards show where each item goes while it is active, and what is put there is saved as that.
+            if (cfg.floatWithoutBar) ChoiceRow(stringResource(R.string.floating_view), listOf(false to stringResource(R.string.floating_view_regular),
+                true to stringResource(R.string.floating_view_desktop)), desktop, help = if (desktop) stringResource(R.string.floating_view_help) else null) { onDesktop(it) }
+            SectionCard(Section.SHOWN, stringResource(R.string.section_shown), stringResource(R.string.section_shown_help), order, states, selected, onSelect, reorder, desktop)
             // With everything shown, this section holds the items that wait for their "Show when" rule.
             SectionCard(Section.HIDDEN, stringResource(if (showAll) R.string.section_when_active else R.string.section_hidden),
-                if (showAll) reveal else stringResource(R.string.section_hidden_help, reveal), order, states, selected, onSelect, reorder)
-            SectionCard(Section.OFF, stringResource(R.string.common_off), stringResource(R.string.section_off_help), order, states, selected, onSelect, reorder)
+                if (showAll) reveal else stringResource(R.string.section_hidden_help, reveal), order, states, selected, onSelect, reorder, desktop)
+            SectionCard(Section.OFF, stringResource(R.string.common_off), stringResource(R.string.section_off_help), order, states, selected, onSelect, reorder, desktop)
         }
         // The dragged row, above all the cards (each card clips its own rows).
         val dragged = reorder.dragging?.let { id -> items.firstOrNull { it.id == id } }
@@ -313,8 +319,8 @@ private fun Sections(items: List<ItemConfig>, states: Map<String, ItemState>, se
 
 @Composable
 private fun SectionCard(section: Section, title: String, help: String, all: List<ItemConfig>, states: Map<String, ItemState>,
-                        selected: String?, onSelect: (String?) -> Unit, reorder: Reorder) {
-    val items = all.filter { it.section == section }
+                        selected: String?, onSelect: (String?) -> Unit, reorder: Reorder, desktop: Boolean) {
+    val items = all.filter { it.sectionIn(desktop) == section }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp).onGloballyPositioned { reorder.cards[section] = it }) {
         // The card grows and shrinks smoothly as a dragged row's opening comes and goes.
@@ -328,7 +334,7 @@ private fun SectionCard(section: Section, title: String, help: String, all: List
             items.forEachIndexed { i, item ->
                 key(item.id) {
                     if (item.id == reorder.dragging) DropOpening(item.id, reorder)
-                    else ItemRow(item, states[item.id], i, items.size, item.id == selected, onSelect, reorder)
+                    else ItemRow(item, states[item.id], i, items.size, item.id == selected, onSelect, reorder, desktop)
                 }
             }
         }
@@ -348,7 +354,8 @@ private fun DropOpening(id: String, reorder: Reorder) {
 private val rowShape = RoundedCornerShape(14.dp)
 
 @Composable
-private fun ItemRow(item: ItemConfig, state: ItemState?, index: Int, count: Int, selected: Boolean, onSelect: (String?) -> Unit, reorder: Reorder) {
+private fun ItemRow(item: ItemConfig, state: ItemState?, index: Int, count: Int, selected: Boolean, onSelect: (String?) -> Unit, reorder: Reorder, desktop: Boolean) {
+    val sec = item.sectionIn(desktop)
     val type = Items.of(item.type) ?: return
     var menu by remember { mutableStateOf(false) }
     val moveUp = stringResource(R.string.row_move_up)
@@ -356,14 +363,14 @@ private fun ItemRow(item: ItemConfig, state: ItemState?, index: Int, count: Int,
     val toShown = stringResource(R.string.row_show_in_bar)
     val toHidden = stringResource(R.string.row_move_to_hidden)
     val turnOff = stringResource(R.string.common_turn_off)
-    val move = { to: Int -> Store.move(item.id, item.section, to) }
+    val move = { to: Int -> Store.move(item.id, sec, to, desktop) }
     // The arrows went away with drag and drop, so screen readers get the moves as actions on the row.
     val actions = buildList {
         if (index > 0) add(CustomAccessibilityAction(moveUp) { move(index - 1); true })
         if (index < count - 1) add(CustomAccessibilityAction(moveDown) { move(index + 1); true })
-        if (item.section != Section.SHOWN) add(CustomAccessibilityAction(toShown) { Store.move(item.id, Section.SHOWN, 999); true })
-        if (item.section != Section.HIDDEN) add(CustomAccessibilityAction(toHidden) { Store.move(item.id, Section.HIDDEN, 999); true })
-        if (item.section != Section.OFF) add(CustomAccessibilityAction(turnOff) { Store.move(item.id, Section.OFF, 999); true })
+        if (sec != Section.SHOWN) add(CustomAccessibilityAction(toShown) { Store.move(item.id, Section.SHOWN, 999, desktop); true })
+        if (sec != Section.HIDDEN) add(CustomAccessibilityAction(toHidden) { Store.move(item.id, Section.HIDDEN, 999, desktop); true })
+        if (sec != Section.OFF) add(CustomAccessibilityAction(turnOff) { Store.move(item.id, Section.OFF, 999, desktop); true })
     }
     val grab = remember { PointerIcon(android.view.PointerIcon.TYPE_GRAB) }
     Row(
@@ -402,11 +409,11 @@ private fun ItemRow(item: ItemConfig, state: ItemState?, index: Int, count: Int,
                     leadingIcon = { SymIcon(Sym.ARROW_UPWARD, size = 18.sp) })
                 if (index < count - 1) DropdownMenuItem(text = { Text(moveDown) }, onClick = { menu = false; move(index + 1) },
                     leadingIcon = { SymIcon(Sym.ARROW_DOWNWARD, size = 18.sp) })
-                if (item.section != Section.SHOWN) DropdownMenuItem(text = { Text(toShown) }, onClick = { menu = false; Store.move(item.id, Section.SHOWN, 999) },
+                if (sec != Section.SHOWN) DropdownMenuItem(text = { Text(toShown) }, onClick = { menu = false; Store.move(item.id, Section.SHOWN, 999, desktop) },
                     leadingIcon = { SymIcon(Sym.VISIBILITY, size = 18.sp) })
-                if (item.section != Section.HIDDEN) DropdownMenuItem(text = { Text(stringResource(R.string.section_hidden)) }, onClick = { menu = false; Store.move(item.id, Section.HIDDEN, 999) },
+                if (sec != Section.HIDDEN) DropdownMenuItem(text = { Text(stringResource(R.string.section_hidden)) }, onClick = { menu = false; Store.move(item.id, Section.HIDDEN, 999, desktop) },
                     leadingIcon = { SymIcon(Sym.VISIBILITY_OFF, size = 18.sp) })
-                if (item.section != Section.OFF) DropdownMenuItem(text = { Text(turnOff) }, onClick = { menu = false; Store.move(item.id, Section.OFF, 999) },
+                if (sec != Section.OFF) DropdownMenuItem(text = { Text(turnOff) }, onClick = { menu = false; Store.move(item.id, Section.OFF, 999, desktop) },
                     leadingIcon = { SymIcon(Sym.REMOVE, size = 18.sp) })
                 DropdownMenuItem(text = { Text(stringResource(R.string.common_delete)) }, onClick = { menu = false; if (selected) onSelect(null); Undo.delete(item) },
                     leadingIcon = { SymIcon(Sym.DELETE, size = 18.sp) })

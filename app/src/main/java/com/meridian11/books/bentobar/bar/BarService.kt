@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.meridian11.books.bentobar.data.ColorMode
 import com.meridian11.books.bentobar.data.DesktopMode
 import com.meridian11.books.bentobar.data.HiddenMode
+import com.meridian11.books.bentobar.data.MAX_EDGE_DP
 import com.meridian11.books.bentobar.data.MAX_OFFSET_Y_DP
 import com.meridian11.books.bentobar.data.offsetYNowDp
 import com.meridian11.books.bentobar.data.positionNow
@@ -410,6 +411,14 @@ class BarController(private val service: AccessibilityService) {
             floatNote("hidden: an app covers the display and no taskbar shows")
             return null
         }
+        val system = boxes(AccessibilityWindowInfo.TYPE_SYSTEM)
+        // A maximized window draws no caption of its own that the strip could sit in, so an app's own top bar lies under it:
+        // with this on, the strip steps aside as it does for a full-screen app.
+        if (cfg.desktopHideMaximized && FloatingBand.isMaximized(apps.filterNot { FloatingBand.coversDisplay(listOf(it), screenW, screenH) }, screenW,
+                FloatingBand.taskbarTop(system, screenW, screenH) ?: screenH)) {
+            floatNote("hidden: a window is maximized")
+            return null
+        }
         val h = if (inset > 0) inset else (FLOAT_HEIGHT_DP * density).toInt()
         // Desktop Mode's own alignment and offset: this runs before DesktopMode.active is set for this look.
         val top = (cfg.desktopOffsetYDp.coerceIn(0, MAX_OFFSET_Y_DP) * density).toInt()
@@ -419,7 +428,7 @@ class BarController(private val service: AccessibilityService) {
         // The empty desktop's own window spans the whole display and has no caption: counting it reserved a
         // title's and buttons' width at both screen edges with nothing there.
         val captioned = apps.filterNot { it.left <= 2 && it.top <= 2 && it.right >= screenW - 2 && it.bottom >= screenH - 2 }
-        val free = FloatingBand.place(captioned, screenW, top, top + h, (FLOAT_EDGE_DP * density).toInt(),
+        val free = FloatingBand.place(captioned, screenW, top, top + h, (cfg.desktopEdgeDp.coerceIn(0, MAX_EDGE_DP) * density).toInt(),
             title, (cfg.floatControlsDp * density).toInt(), if (neededPx > 0) neededPx + chrome else 0, align)
         val caption = captioned.any { it.top < top + h && it.bottom > top }
         floatNote("free=${free.left}..${free.right} top=$top h=$h need=$neededPx windows=${apps.joinToString(";") { "${it.left},${it.top},${it.right},${it.bottom}" }} caption=$caption")
@@ -463,10 +472,12 @@ class BarController(private val service: AccessibilityService) {
         val ends = (STRIP_PILL_PADDING.value * density).toInt()
         val out = if (cfg.pill == Pill.NONE) ends else 0
         // Floating, a stretch that reaches the screen's side is flush with it; elsewhere the items keep their gap.
-        val gapL = if (floating && s.free.left <= 0) 0 else gap
-        val gapR = if (floating && s.free.right >= screenW) 0 else gap
-        val outL = if (floating && s.free.left <= 0) ends else out
-        val outR = if (floating && s.free.right >= screenW) ends else out
+        // The room kept from the screen's side (Desktop Mode's setting) is where its pill, or without one its items, start.
+        val edgePx = (cfg.desktopEdgeDp.coerceIn(0, MAX_EDGE_DP) * density).toInt()
+        val gapL = if (floating && s.free.left <= edgePx) 0 else gap
+        val gapR = if (floating && s.free.right >= screenW - edgePx) 0 else gap
+        val outL = out
+        val outR = out
         val width = strip.params.width
         when (cfg.positionNow) {
             Position.RIGHT -> { p.gravity = Gravity.TOP or Gravity.RIGHT; p.x = screenW - s.free.right + gapR - outR }
@@ -1061,8 +1072,6 @@ class BarController(private val service: AccessibilityService) {
         private const val FLOATING_ID = -1
         /** How tall the floating strip is when Android gives no status bar height (a window caption is about this tall). */
         private const val FLOAT_HEIGHT_DP = 40
-        /** The gap kept from the screen's sides while floating. */
-        private const val FLOAT_EDGE_DP = 0
         /** [BarSnapshot.summary] of a floating strip: over a window's caption, or over the bare desktop. */
         private const val FLOAT_CAPTION = "floating:caption"
         private const val FLOAT_DESKTOP = "floating:desktop"

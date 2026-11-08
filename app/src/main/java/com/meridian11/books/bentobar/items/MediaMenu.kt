@@ -105,6 +105,15 @@ internal fun MediaMenu(item: ItemConfig, host: MenuHost) {
         main?.let { MediaText.Controls(it.playing, it.durationMs, it.canPrevious, it.canPlayPause, it.canNext) }, words)
     // The first player, where the menu is about one.
     val player = main?.takeIf { view.player }
+    // "Color from the album art": the controls and the bar take the cover's color, and the popup's glass a little of it.
+    val art = MediaItem.popupColor(item)
+    val dark = androidx.compose.foundation.isSystemInDarkTheme()
+    val tint = art?.let { androidx.compose.ui.graphics.Color(ArtColor.forBackground(it, dark)) }
+    androidx.compose.runtime.DisposableEffect(art) {
+        com.meridian11.books.bentobar.ui.MenuTint.color.value = art
+        onDispose { com.meridian11.books.bentobar.ui.MenuTint.color.value = null }
+    }
+    MaterialTheme(colorScheme = if (tint == null) MaterialTheme.colorScheme else MaterialTheme.colorScheme.copy(primary = tint, onPrimary = com.meridian11.books.bentobar.bar.Contrast.readableOn(tint))) {
     MenuCard(Sym.MUSIC_NOTE, stringResource(R.string.item_media_title), view.subtitle) {
         if (player != null && track != null) {
             if (view.track) TrackBlock(player.art, track.title, track.artist, track.album, MediaText.spoken(track, words))
@@ -137,6 +146,7 @@ internal fun MediaMenu(item: ItemConfig, host: MenuHost) {
             if (remember { Env.sideloaded() }) MenuNote(stringResource(R.string.media_access_restricted))
             MenuEntry(Sym.TOGGLE_ON, stringResource(R.string.media_access_allow)) { host.close(); NowPlaying.openAccessSettings() }
         }
+    }
     }
 }
 
@@ -202,6 +212,7 @@ internal fun PositionBar(session: NowPlaying.Session) {
     var sought by remember(length) { mutableStateOf<Long?>(null) }
     LaunchedEffect(sought) { if (sought != null) { delay(SOUGHT_MS); sought = null } }
     val shown = MediaText.position(session.position(Now.elapsed()), dragged?.toLong(), sought, length)
+    val wavy = com.meridian11.books.bentobar.data.Store.config.collectAsState().value.wavyBars
     val label = stringResource(R.string.media_position)
     val state = MediaText.positionState(shown, length, MediaItem.words)
     Column(Modifier.fillMaxWidth()) {
@@ -228,7 +239,10 @@ internal fun PositionBar(session: NowPlaying.Session) {
                         .then(if (focused) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, ring) else Modifier)
                         .semantics { contentDescription = label; stateDescription = state },
                     track = {
-                        SliderDefaults.Track(it, modifier = Modifier.height(6.dp), drawStopIndicator = null, drawTick = { _, _ -> }, thumbTrackGapSize = 0.dp,
+                        if (wavy) com.meridian11.books.bentobar.ui.WavyTrack(
+                            ((it.value - it.valueRange.start) / (it.valueRange.endInclusive - it.valueRange.start)).coerceIn(0f, 1f),
+                            MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.surfaceContainerHighest, Modifier.fillMaxWidth().height(32.dp))
+                        else SliderDefaults.Track(it, modifier = Modifier.height(6.dp), drawStopIndicator = null, drawTick = { _, _ -> }, thumbTrackGapSize = 0.dp,
                             colors = SliderDefaults.colors(activeTrackColor = MaterialTheme.colorScheme.primary,
                                 inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest))
                     },
@@ -314,8 +328,11 @@ internal fun MediaOptions(item: ItemConfig, set: (ItemConfig) -> Unit) {
     SwitchRow(stringResource(R.string.media_art), MediaText.art(item.options), help = stringResource(R.string.media_art_help)) {
         set(item.with(MediaText.OPTION_ART, it.toString()))
     }
-    SwitchRow(stringResource(R.string.media_wave), MediaText.wave(item.options), help = stringResource(R.string.media_wave_help)) {
-        set(item.with(MediaText.OPTION_WAVE, it.toString()))
+    SwitchRow(stringResource(R.string.media_progress), MediaText.progress(item.options), help = stringResource(R.string.media_progress_help)) {
+        set(item.with(MediaText.OPTION_PROGRESS, it.toString()))
+    }
+    SwitchRow(stringResource(R.string.media_art_color), MediaText.artColor(item.options), help = stringResource(R.string.media_art_color_help)) {
+        set(item.with(MediaText.OPTION_ART_COLOR, it.toString()))
     }
     ChoiceRow(stringResource(R.string.media_click), listOf(MediaText.CLICK_MENU to stringResource(R.string.media_click_menu),
         MediaText.CLICK_TOGGLE to stringResource(R.string.media_click_toggle)),

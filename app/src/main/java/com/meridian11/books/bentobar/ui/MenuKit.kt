@@ -429,6 +429,10 @@ fun ChipRow(labels: List<String>, selected: Int? = null, onClick: (Int) -> Unit)
 /** A thin progress track. */
 @Composable
 fun Meter(fraction: Float, color: Color = MaterialTheme.colorScheme.primary) {
+    if (com.meridian11.books.bentobar.data.Store.config.collectAsState().value.wavyBars) {
+        WavyTrack(fraction, color, MaterialTheme.colorScheme.surfaceContainerHighest, Modifier.fadeIn(0f).fillMaxWidth().height(12.dp))
+        return
+    }
     Box(Modifier.fadeIn(0f).fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
         // The fill grows from its start and stops on its value (§7.2).
         Box(Modifier.drawIn(30f).fillMaxWidth(fraction.coerceIn(0f, 1f)).height(6.dp).clip(RoundedCornerShape(50)).background(color))

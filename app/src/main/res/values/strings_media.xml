@@ -44,6 +44,8 @@
     <string name="media_desc_paused_unknown">Playback paused</string>
     <string name="media_art">Album art as the icon</string>
     <string name="media_art_help">Shows the cover of what plays in place of the note, when the player provides one.</string>
-    <string name="media_wave">Wavy line while playing</string>
-    <string name="media_wave_help">A small moving line beside the icon shows that music is playing.</string>
+    <string name="media_progress">Progress bar</string>
+    <string name="media_progress_help">Shows how far the track has played beside the icon. Drag it to move through the track, if the player allows it.</string>
+    <string name="media_art_color">Color from the album art</string>
+    <string name="media_art_color_help">The progress bar and the popup take their color from the cover of what plays.</string>
 </resources>

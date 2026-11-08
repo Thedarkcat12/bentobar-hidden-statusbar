@@ -17,4 +17,11 @@
     <string name="floating_overlap_help">When BentoBar\'s icons would collide with a window\'s title bar, they keep showing and lie over the app\'s icon and name instead of being hidden. They never cover the window\'s buttons.</string>
     <string name="floating_offset">Distance from the top</string>
     <string name="floating_offset_desktop">Distance from the top in Desktop Mode</string>
+    <string name="floating_view">Show items as in</string>
+    <string name="floating_view_regular">Regular</string>
+    <string name="floating_view_desktop">Desktop Mode</string>
+    <string name="floating_view_help">What you put in each card here is where the item goes while Desktop Mode is active. The order is shared with the regular bar.</string>
+    <string name="floating_edge">Distance from the screen\'s sides</string>
+    <string name="floating_hide_max">Hide over maximized windows</string>
+    <string name="floating_hide_max_help">While a window is maximized (it fills the screen above the taskbar), BentoBar steps aside, since an app\'s own top bar would lie under it. It comes back when the window is smaller.</string>
 </resources>

@@ -27,8 +27,18 @@ object FloatingBand {
      * takes the status bar's place. It hides with a full-screen app, so while it shows nothing is
      * full screen, whatever the home screen's own window reaches (it may well span the display).
      */
-    fun hasTaskbar(system: List<AppWindow>, screenW: Int, screenH: Int, slack: Int = 2): Boolean =
-        system.any { it.bottom >= screenH - slack && it.right - it.left >= screenW / 2 && it.bottom - it.top in 1..screenH / 4 }
+    fun hasTaskbar(system: List<AppWindow>, screenW: Int, screenH: Int, slack: Int = 2): Boolean = taskbarTop(system, screenW, screenH, slack) != null
+
+    /** The top edge of the taskbar (see [hasTaskbar]), or null when none shows. */
+    fun taskbarTop(system: List<AppWindow>, screenW: Int, screenH: Int, slack: Int = 2): Int? =
+        system.filter { it.bottom >= screenH - slack && it.right - it.left >= screenW / 2 && it.bottom - it.top in 1..screenH / 4 }.minOfOrNull { it.top }
+
+    /**
+     * True when a window spans the screen's width from its top edge down to [floorY] (the taskbar's top, or the
+     * display's bottom with none): maximized, as against full screen, which has no taskbar either.
+     */
+    fun isMaximized(windows: List<AppWindow>, screenW: Int, floorY: Int, slack: Int = 2): Boolean =
+        windows.any { it.left <= slack && it.right >= screenW - slack && it.top <= slack && it.bottom >= floorY - slack }
 
     /**
      * True when an app window covers the whole display: a full-screen app has no caption and no

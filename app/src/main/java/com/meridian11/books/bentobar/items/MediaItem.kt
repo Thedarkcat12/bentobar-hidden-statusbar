@@ -103,11 +103,53 @@ object MediaItem : ItemType("media", R.string.item_media_title, Sym.MUSIC_NOTE, 
             icon = when (bar.glyph) { MediaText.Glyph.NOTE -> Sym.MUSIC_NOTE; MediaText.Glyph.PAUSE -> Sym.PAUSE; MediaText.Glyph.OFF -> Sym.MUSIC_OFF },
             // The cover of what plays, in the icon's place, when the player has one and the option is on; the glyph otherwise.
             image = if (MediaText.art(item.options)) main?.art else null,
-            wave = MediaText.wave(item.options) && phase == MediaText.Phase.PLAYING,
+            progress = progress(item, main),
             text = bar.text, desc = bar.desc, active = bar.active, tooltip = bar.tooltip,
             // The count decides what is said; the strip also holds the text to 8.5 dp a character, for scripts whose letters are wide.
             textLimit = if (bar.text == null) 0 else chars)
     }
+
+    /** Where a drag on the bar's progress bar sent the player, and when: the bar stays there until the player has got there. */
+    @Volatile private var soughtLevel = 0f
+    @Volatile private var soughtAt = 0L
+
+    private fun progress(item: ItemConfig, main: NowPlaying.Session?): BarProgress? {
+        if (!MediaText.progress(item.options) || main == null || main.durationMs <= 0) return null
+        val now = Now.elapsed()
+        val level = if (now - soughtAt in 0..SOUGHT_MS) soughtLevel
+        else (main.position(now).toFloat() / main.durationMs).coerceIn(0f, 1f)
+        return BarProgress(level, main.canSeek, if (MediaText.artColor(item.options)) coverColor(main.art) ?: 0 else 0)
+    }
+
+    /** A drag on the progress bar, let go at [level]: the player is sent there. */
+    override fun onSlide(item: ItemConfig, level: Float, done: Boolean) {
+        if (!done) return
+        val main = NowPlaying.state.value.main ?: return
+        if (!main.canSeek || main.durationMs <= 0) return
+        soughtLevel = level.coerceIn(0f, 1f)
+        soughtAt = Now.elapsed()
+        NowPlaying.seekTo(main.key, (soughtLevel * main.durationMs).toLong())
+    }
+
+    /** The cover's color (see [ArtColor]), worked out once for each picture; null for none or a grey one. */
+    private var colored: Bitmap? = null
+    private var coloredArgb: Int? = null
+
+    @Synchronized fun coverColor(art: Bitmap?): Int? {
+        if (art == null) return null
+        if (art !== colored) {
+            colored = art
+            coloredArgb = runCatching {
+                val small = Bitmap.createScaledBitmap(art, 24, 24, true)
+                ArtColor.of(IntArray(24 * 24).also { small.getPixels(it, 0, 24, 0, 0, 24, 24) })
+            }.getOrNull()
+        }
+        return coloredArgb
+    }
+
+    /** The color a popup of this item takes from the cover, or null: the option is off, nothing plays or the cover has no color. */
+    fun popupColor(item: ItemConfig): Int? =
+        if (MediaText.artColor(item.options)) coverColor(NowPlaying.state.value.main?.art) else null
 
     /** With "A click: Plays or pauses" the item acts on a click, as Keep awake does; right-click › Open still reaches the menu. */
     override fun onClick(item: ItemConfig): Boolean {
@@ -146,6 +188,7 @@ object MediaItem : ItemType("media", R.string.item_media_title, Sym.MUSIC_NOTE, 
     }
 
     private const val STAGED = "staged:"
+    private const val SOUGHT_MS = 2_000L
 
     private fun stage(sample: MediaSamples.Sample?) {
         val now = Now.elapsed()

@@ -138,6 +138,25 @@ class FloatingBandTest {
         assertFalse(FloatingBand.hasTaskbar(emptyList(), screenW, screenH))
     }
 
+    @Test fun theTaskbarsTopIsWhereItsWindowStarts() {
+        assertEquals(screenH - 108, FloatingBand.taskbarTop(listOf(AppWindow(9, 0, screenH - 108, screenW, screenH)), screenW, screenH))
+        assertEquals(null, FloatingBand.taskbarTop(emptyList(), screenW, screenH))
+    }
+
+    @Test fun aWindowFromTheTopEdgeToTheTaskbarAcrossTheWidthIsMaximized() {
+        val floor = screenH - 108
+        assertTrue(FloatingBand.isMaximized(listOf(AppWindow(1, 0, 0, screenW, floor)), screenW, floor))
+        assertTrue(FloatingBand.isMaximized(listOf(AppWindow(1, 0, 0, screenW, floor - 1)), screenW, floor))
+    }
+
+    @Test fun aFloatingOrSnappedWindowIsNotMaximized() {
+        val floor = screenH - 108
+        assertFalse(FloatingBand.isMaximized(listOf(AppWindow(1, 100, 40, 1500, 900)), screenW, floor))
+        assertFalse(FloatingBand.isMaximized(listOf(AppWindow(1, 0, 0, screenW / 2, floor)), screenW, floor))
+        assertFalse(FloatingBand.isMaximized(listOf(AppWindow(1, 0, 60, screenW, floor)), screenW, floor))
+        assertFalse(FloatingBand.isMaximized(emptyList(), screenW, floor))
+    }
+
     @Test fun aMaximizedWindowAboveTheTaskbarIsNotFullScreen() {
         assertFalse(FloatingBand.coversDisplay(listOf(AppWindow(1, 0, 0, screenW, screenH - 108)), screenW, screenH))
         assertFalse(FloatingBand.coversDisplay(emptyList(), screenW, screenH))

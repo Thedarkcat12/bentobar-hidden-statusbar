@@ -37,6 +37,7 @@ import com.meridian11.books.bentobar.data.ItemConfig
 import com.meridian11.books.bentobar.data.Section
 import com.meridian11.books.bentobar.data.Store
 import com.meridian11.books.bentobar.data.moved
+import com.meridian11.books.bentobar.data.sectionIn
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -92,6 +93,8 @@ class Reorder {
 
     /** All items, as the Store has them (set by the composable). */
     var items: List<ItemConfig> = emptyList()
+    /** The Bar page shows the Desktop Mode places (set by the composable). */
+    var desktop: Boolean = false
     var container: LayoutCoordinates? = null
     /** Each row's bounds (the opening registers under the dragged id), its draggable area and its handle. */
     val rows = HashMap<String, LayoutCoordinates>()
@@ -107,8 +110,8 @@ class Reorder {
         val s = spot
         val p = pending
         return when {
-            id != null && s != null -> items.moved(id, s.section, s.index)
-            p != null -> items.moved(p.first, p.second.section, p.second.index)
+            id != null && s != null -> items.moved(id, s.section, s.index, desktop)
+            p != null -> items.moved(p.first, p.second.section, p.second.index, desktop)
             else -> items
         }
     }
@@ -136,7 +139,7 @@ class Reorder {
         pointerY = down.y
         container?.let { pointerInWindow = it.localToWindow(down) }
         pending = null
-        spot = DropSpot(item.section, items.filter { it.section == item.section }.indexOfFirst { it.id == id })
+        spot = DropSpot(item.sectionIn(desktop), items.filter { it.sectionIn(desktop) == item.sectionIn(desktop) }.indexOfFirst { it.id == id })
         dragging = id
     }
 
@@ -156,7 +159,7 @@ class Reorder {
         val preview = order(items)
         val cardSpans = Section.entries.mapNotNull { s -> bounds(cards[s])?.let { s to it.top..it.bottom } }.sortedBy { it.second.start }
         val middles = Section.entries.associateWith { s ->
-            preview.filter { it.section == s && it.id != id }.mapNotNull { bounds(rows[it.id])?.center?.y }
+            preview.filter { it.sectionIn(desktop) == s && it.id != id }.mapNotNull { bounds(rows[it.id])?.center?.y }
         }
         val next = dropSpot(ghostTop + rowHeight / 2, cardSpans, middles, current)
         if (next != current) spot = next
@@ -186,7 +189,7 @@ class Reorder {
             animate(from, target, animationSpec = Motion.spec(tween(140))) { v, _ -> settleTop = v }
         }
         pending = id to s
-        Store.move(id, s.section, s.index)
+        Store.move(id, s.section, s.index, desktop)
         dragging = null
         spot = null
         settleTop = null

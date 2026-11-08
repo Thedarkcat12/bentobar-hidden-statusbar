@@ -56,6 +56,7 @@ import com.meridian11.books.bentobar.R
 import com.meridian11.books.bentobar.data.ChipMode
 import com.meridian11.books.bentobar.data.ColorMode
 import com.meridian11.books.bentobar.data.DesktopAlign
+import com.meridian11.books.bentobar.data.MAX_EDGE_DP
 import com.meridian11.books.bentobar.data.MAX_OFFSET_Y_DP
 import com.meridian11.books.bentobar.data.MIN_POPUP_OPAQUE
 import com.meridian11.books.bentobar.data.Pill
@@ -179,6 +180,10 @@ fun LookPage() {
                 DesktopAlign.RIGHT to stringResource(R.string.floating_align_right), DesktopAlign.CENTER to stringResource(R.string.floating_align_center),
                 DesktopAlign.LEFT to stringResource(R.string.floating_align_left)), cfg.desktopAlign) { v -> Store.update { it.copy(desktopAlign = v) } }
             SliderRow(stringResource(R.string.floating_offset_desktop), cfg.desktopOffsetYDp, 0..MAX_OFFSET_Y_DP, { "$it dp" }) { v -> Store.update { it.copy(desktopOffsetYDp = v) } }
+            SliderRow(stringResource(R.string.floating_edge), cfg.desktopEdgeDp.coerceIn(0, MAX_EDGE_DP), 0..MAX_EDGE_DP, { "$it dp" }) { v -> Store.update { it.copy(desktopEdgeDp = v) } }
+            SwitchRow(stringResource(R.string.floating_hide_max), cfg.desktopHideMaximized, help = stringResource(R.string.floating_hide_max_help)) { on ->
+                Store.update { it.copy(desktopHideMaximized = on) }
+            }
             SwitchRow(stringResource(R.string.floating_overlap), cfg.desktopOverlap, help = stringResource(R.string.floating_overlap_help)) { on ->
                 Store.update { it.copy(desktopOverlap = on) }
             }
@@ -210,6 +215,7 @@ fun LookPage() {
         SliderRow(stringResource(R.string.popup_opacity), cfg.popupOpaque.coerceIn(MIN_POPUP_OPAQUE, 100), MIN_POPUP_OPAQUE..100, { "$it%" }) { v ->
             Store.update { it.copy(popupOpaque = v) }
         }
+        SwitchRow(stringResource(R.string.wavy_bars), cfg.wavyBars, help = stringResource(R.string.wavy_bars_help)) { on -> Store.update { it.copy(wavyBars = on) } }
         SwitchRow(stringResource(R.string.look_system_tint), cfg.systemTint, help = stringResource(R.string.look_system_tint_help)) { on ->
             Store.update { it.copy(systemTint = on) }
         }

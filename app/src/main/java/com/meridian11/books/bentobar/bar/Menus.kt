@@ -74,6 +74,8 @@ fun MenuSurface(width: Dp, maxHeight: Dp, glass: MenuGlassState?, content: @Comp
         val conf = Store.config.collectAsState().value
         val tint = conf.systemTint
         val opaque = conf.popupOpaque
+        // Now playing's "Color from the album art": a little of the cover's color in the veil.
+        val cover = com.meridian11.books.bentobar.ui.MenuTint.color.collectAsState().value
         val hue = if (dark) scheme.onSecondary else scheme.secondaryContainer
         val look = GlassLook(
             veil = (when {
@@ -81,7 +83,8 @@ fun MenuSurface(width: Dp, maxHeight: Dp, glass: MenuGlassState?, content: @Comp
                 g.blur -> scheme.surfaceContainerLowest.copy(alpha = if (dark) 0.62f else 0.56f)
                 tint -> lerp(scheme.surfaceContainerHigh, hue, 0.5f)
                 else -> scheme.surfaceContainerHigh
-            }).let { it.copy(alpha = popupAlpha(it.alpha, opaque)) },
+            }).let { it.copy(alpha = popupAlpha(it.alpha, opaque)) }
+                .let { v -> if (cover == null) v else lerp(v, Color(cover).copy(alpha = v.alpha), 0.22f) },
             rim = Color.White.copy(alpha = if (dark) 0.44f else 0.80f),
             hairline = Color.Black.copy(alpha = if (dark) 0.28f else 0.20f),
             dark = dark,
