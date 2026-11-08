@@ -1,6 +1,7 @@
 package com.meridian11.books.bentobar.bar
 
 import android.graphics.Rect
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
