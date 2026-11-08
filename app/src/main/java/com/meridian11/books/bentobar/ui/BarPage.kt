@@ -98,7 +98,7 @@ import com.meridian11.books.bentobar.data.ItemConfig
 import com.meridian11.books.bentobar.data.Position
 import com.meridian11.books.bentobar.data.DesktopWhere
 import com.meridian11.books.bentobar.data.Section
-import com.meridian11.books.bentobar.data.sectionIn
+import com.meridian11.books.bentobar.data.cardIn
 import com.meridian11.books.bentobar.data.shows
 import com.meridian11.books.bentobar.data.behindChevron
 import com.meridian11.books.bentobar.data.HiddenMode
@@ -300,9 +300,9 @@ private fun Sections(items: List<ItemConfig>, states: Map<String, ItemState>, se
             // With Desktop Mode on, the same cards show where each item goes while it is active, and what is put there is saved as that.
             if (cfg.floatWithoutBar) ChoiceRow(stringResource(R.string.floating_view), listOf(false to stringResource(R.string.floating_view_regular),
                 true to stringResource(R.string.floating_view_desktop)), desktop, help = if (desktop) stringResource(R.string.floating_view_help) else null) { onDesktop(it) }
-            SectionCard(Section.SHOWN, stringResource(R.string.section_shown), stringResource(R.string.section_shown_help), order, states, selected, onSelect, reorder, desktop)
+            SectionCard(Section.SHOWN, stringResource(R.string.section_shown), stringResource(R.string.section_shown_help) + " " + stringResource(R.string.section_shown_popups), order, states, selected, onSelect, reorder, desktop)
             // With everything shown, this section holds the items that wait for their "Show when" rule.
-            SectionCard(Section.HIDDEN, stringResource(if (showAll) R.string.section_when_active else R.string.section_hidden),
+            SectionCard(Section.HIDDEN, stringResource(R.string.section_hidden),
                 if (showAll) reveal else stringResource(R.string.section_hidden_help, reveal), order, states, selected, onSelect, reorder, desktop)
             SectionCard(Section.OFF, stringResource(R.string.common_off), stringResource(R.string.section_off_help), order, states, selected, onSelect, reorder, desktop)
         }
@@ -320,7 +320,7 @@ private fun Sections(items: List<ItemConfig>, states: Map<String, ItemState>, se
 @Composable
 private fun SectionCard(section: Section, title: String, help: String, all: List<ItemConfig>, states: Map<String, ItemState>,
                         selected: String?, onSelect: (String?) -> Unit, reorder: Reorder, desktop: Boolean) {
-    val items = all.filter { it.sectionIn(desktop) == section }
+    val items = all.filter { it.cardIn(desktop) == section }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp).onGloballyPositioned { reorder.cards[section] = it }) {
         // The card grows and shrinks smoothly as a dragged row's opening comes and goes.
@@ -355,7 +355,7 @@ private val rowShape = RoundedCornerShape(14.dp)
 
 @Composable
 private fun ItemRow(item: ItemConfig, state: ItemState?, index: Int, count: Int, selected: Boolean, onSelect: (String?) -> Unit, reorder: Reorder, desktop: Boolean) {
-    val sec = item.sectionIn(desktop)
+    val sec = item.cardIn(desktop)
     val type = Items.of(item.type) ?: return
     var menu by remember { mutableStateOf(false) }
     val moveUp = stringResource(R.string.row_move_up)

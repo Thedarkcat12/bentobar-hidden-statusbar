@@ -60,13 +60,13 @@ data class ItemConfig(
 fun List<ItemConfig>.moved(id: String, section: Section, index: Int, desktop: Boolean = false): List<ItemConfig> {
     val item = firstOrNull { it.id == id } ?: return this
     val rest = filterNot { it.id == id }
-    val inSection = rest.withIndex().filter { it.value.sectionIn(desktop) == section }
+    val inSection = rest.withIndex().filter { it.value.cardIn(desktop) == section }
     val at = when {
         inSection.isEmpty() -> rest.size
         index >= inSection.size -> inSection.last().index + 1
         else -> inSection[index.coerceAtLeast(0)].index
     }
-    return rest.toMutableList().apply { add(at, item.placedIn(section, desktop)) }
+    return rest.toMutableList().apply { add(at, item.droppedOn(section, desktop)) }
 }
 
 /**
@@ -180,6 +180,22 @@ enum class DesktopWhere { SAME, SHOWN, HIDDEN, OFF }
 /** The section this item is in as the Bar page shows it: its Desktop Mode place in the Desktop Mode view, else [ItemConfig.section]. */
 fun ItemConfig.sectionIn(desktop: Boolean): Section = if (!desktop) section else when (this.desktop) {
     DesktopWhere.SAME -> section; DesktopWhere.SHOWN -> Section.SHOWN; DesktopWhere.HIDDEN -> Section.HIDDEN; DesktopWhere.OFF -> Section.OFF
+}
+
+/** An item with a "Show when" rule in Hidden: it comes into the bar by itself, so the Bar page lists it among the items in the bar. */
+fun ItemConfig.popsUpIn(desktop: Boolean): Boolean = whenActive && sectionIn(desktop) == Section.HIDDEN
+
+/** The Bar page card this item is listed in: a pop-up item is in the bar's, where its place among the others is set. */
+fun ItemConfig.cardIn(desktop: Boolean): Section = if (popsUpIn(desktop)) Section.SHOWN else sectionIn(desktop)
+
+/**
+ * This item after it is dropped on [card]: a pop-up item dropped in the bar's card only changes place and stays a pop-up;
+ * dropped on Hidden it is no pop-up any more (its rule is cleared, it waits behind ‹); anything else is [placedIn].
+ */
+fun ItemConfig.droppedOn(card: Section, desktop: Boolean): ItemConfig = when {
+    popsUpIn(desktop) && card == Section.SHOWN -> this
+    popsUpIn(desktop) && card == Section.HIDDEN -> copy(whenActive = false)
+    else -> placedIn(card, desktop)
 }
 
 /** This item put in [section] as that view shows it: the Desktop Mode view sets its Desktop Mode place (back to Same as usual when that is its usual one). */

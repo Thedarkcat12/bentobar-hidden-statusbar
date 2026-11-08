@@ -24,4 +24,5 @@
     <string name="floating_edge">Distance from the screen\'s sides</string>
     <string name="floating_hide_max">Hide over maximized windows</string>
     <string name="floating_hide_max_help">While a window is maximized (it fills the screen above the taskbar), BentoBar steps aside, since an app\'s own top bar would lie under it. It comes back when the window is smaller.</string>
+    <string name="section_shown_popups">Items with a Show when… rule sit where they will pop in.</string>
 </resources>

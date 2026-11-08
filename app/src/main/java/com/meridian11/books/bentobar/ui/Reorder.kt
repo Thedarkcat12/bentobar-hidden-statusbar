@@ -37,7 +37,7 @@ import com.meridian11.books.bentobar.data.ItemConfig
 import com.meridian11.books.bentobar.data.Section
 import com.meridian11.books.bentobar.data.Store
 import com.meridian11.books.bentobar.data.moved
-import com.meridian11.books.bentobar.data.sectionIn
+import com.meridian11.books.bentobar.data.cardIn
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -139,7 +139,7 @@ class Reorder {
         pointerY = down.y
         container?.let { pointerInWindow = it.localToWindow(down) }
         pending = null
-        spot = DropSpot(item.sectionIn(desktop), items.filter { it.sectionIn(desktop) == item.sectionIn(desktop) }.indexOfFirst { it.id == id })
+        spot = DropSpot(item.cardIn(desktop), items.filter { it.cardIn(desktop) == item.cardIn(desktop) }.indexOfFirst { it.id == id })
         dragging = id
     }
 
@@ -159,7 +159,7 @@ class Reorder {
         val preview = order(items)
         val cardSpans = Section.entries.mapNotNull { s -> bounds(cards[s])?.let { s to it.top..it.bottom } }.sortedBy { it.second.start }
         val middles = Section.entries.associateWith { s ->
-            preview.filter { it.sectionIn(desktop) == s && it.id != id }.mapNotNull { bounds(rows[it.id])?.center?.y }
+            preview.filter { it.cardIn(desktop) == s && it.id != id }.mapNotNull { bounds(rows[it.id])?.center?.y }
         }
         val next = dropSpot(ghostTop + rowHeight / 2, cardSpans, middles, current)
         if (next != current) spot = next
