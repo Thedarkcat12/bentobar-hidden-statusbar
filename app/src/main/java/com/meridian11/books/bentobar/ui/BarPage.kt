@@ -96,6 +96,7 @@ import com.meridian11.books.bentobar.data.ColorMode
 import com.meridian11.books.bentobar.data.Display
 import com.meridian11.books.bentobar.data.ItemConfig
 import com.meridian11.books.bentobar.data.Position
+import com.meridian11.books.bentobar.data.DesktopWhere
 import com.meridian11.books.bentobar.data.Section
 import com.meridian11.books.bentobar.data.shows
 import com.meridian11.books.bentobar.data.behindChevron
@@ -521,6 +522,13 @@ private fun ItemDetailCard(item: ItemConfig, state: ItemState?, onSelect: (Strin
             ChoiceRow(stringResource(R.string.detail_where), listOf(Section.SHOWN to stringResource(R.string.section_shown),
                 Section.HIDDEN to stringResource(R.string.section_hidden), Section.OFF to stringResource(R.string.common_off)), item.section) { s ->
                 Store.move(item.id, s, 999)
+            }
+            // With Desktop Mode on, an item can live somewhere else while it is active (no status bar: more room, or less).
+            if (Store.config.collectAsState().value.floatWithoutBar) ChoiceRow(stringResource(R.string.floating_item_where),
+                listOf(DesktopWhere.SAME to stringResource(R.string.floating_where_same), DesktopWhere.SHOWN to stringResource(R.string.section_shown),
+                    DesktopWhere.HIDDEN to stringResource(R.string.section_hidden), DesktopWhere.OFF to stringResource(R.string.common_off)),
+                item.desktop, help = stringResource(R.string.floating_item_where_help)) { w ->
+                Store.updateItem(item.id) { it.copy(desktop = w) }; Ticker.refresh()
             }
             val trigger = type.trigger
             if (type.canBeActive && trigger != null) TriggerControl(item, trigger)

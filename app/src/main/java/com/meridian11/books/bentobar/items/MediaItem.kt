@@ -101,6 +101,9 @@ object MediaItem : ItemType("media", R.string.item_media_title, Sym.MUSIC_NOTE, 
         return ItemState(
             // Each state has a glyph of its own, always filled: at this size the note looks the same outlined.
             icon = when (bar.glyph) { MediaText.Glyph.NOTE -> Sym.MUSIC_NOTE; MediaText.Glyph.PAUSE -> Sym.PAUSE; MediaText.Glyph.OFF -> Sym.MUSIC_OFF },
+            // The cover of what plays, in the icon's place, when the player has one and the option is on; the glyph otherwise.
+            image = if (MediaText.art(item.options)) main?.art else null,
+            wave = MediaText.wave(item.options) && phase == MediaText.Phase.PLAYING,
             text = bar.text, desc = bar.desc, active = bar.active, tooltip = bar.tooltip,
             // The count decides what is said; the strip also holds the text to 8.5 dp a character, for scripts whose letters are wide.
             textLimit = if (bar.text == null) 0 else chars)

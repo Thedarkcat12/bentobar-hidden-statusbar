@@ -35,7 +35,6 @@ import com.meridian11.books.bentobar.data.ColorMode
 import com.meridian11.books.bentobar.data.DesktopMode
 import com.meridian11.books.bentobar.data.HiddenMode
 import com.meridian11.books.bentobar.data.MAX_OFFSET_Y_DP
-import com.meridian11.books.bentobar.data.hiddenModeNow
 import com.meridian11.books.bentobar.data.offsetYNowDp
 import com.meridian11.books.bentobar.data.positionNow
 import com.meridian11.books.bentobar.data.shows
@@ -45,6 +44,7 @@ import com.meridian11.books.bentobar.data.ItemConfig
 import com.meridian11.books.bentobar.data.Pill
 import com.meridian11.books.bentobar.data.Position
 import com.meridian11.books.bentobar.data.Section
+import com.meridian11.books.bentobar.data.sectionNow
 import com.meridian11.books.bentobar.data.Store
 import com.meridian11.books.bentobar.data.TextSize
 import com.meridian11.books.bentobar.items.Caffeine
@@ -234,7 +234,7 @@ class BarController(private val service: AccessibilityService) {
     fun start() {
         started = true
         // Pinned open with ‹ before a restart: open again.
-        Store.config.value.let { if (it.pinnedOpen && it.hiddenModeNow != HiddenMode.SHOW_ALL) { expanded.value = true; pinned = true } }
+        Store.config.value.let { if (it.pinnedOpen && it.hiddenMode != HiddenMode.SHOW_ALL) { expanded.value = true; pinned = true } }
         service.registerReceiver(screen, IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_ON); addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_USER_PRESENT)
         })
@@ -303,7 +303,7 @@ class BarController(private val service: AccessibilityService) {
         // Colour back to "Match the status bar": read the bar again (nothing else would until it changes).
         Store.config.value.color.let { if (it != lastColor) { if (it == ColorMode.AUTO && lastColor != null) readSoon(ColorWatch.Cause.QUICK, 100); lastColor = it } }
         // Switched to Show everything (or presenting) with hidden items out: nothing can fold them back.
-        Store.config.value.let { if ((it.hiddenModeNow == HiddenMode.SHOW_ALL || it.presenting) && expanded.value) { expanded.value = false; pinned = false } }
+        Store.config.value.let { if ((it.hiddenMode == HiddenMode.SHOW_ALL || it.presenting) && expanded.value) { expanded.value = false; pinned = false } }
         applyLook()
         if (Ticker.running) Ticker.refresh()
         scan()
@@ -416,10 +416,13 @@ class BarController(private val service: AccessibilityService) {
         val align = cfg.desktopAlign.resolve(cfg.position)
         val title = if (cfg.desktopOverlap) 0 else (cfg.floatTitleDp * density).toInt()
         val chrome = if (cfg.pill == Pill.NONE) 2 * (6 * density).toInt() else 2 * (6 * density).toInt() + 2 * (STRIP_PILL_PADDING.value * density).toInt()
-        val free = FloatingBand.place(apps, screenW, top, top + h, (FLOAT_EDGE_DP * density).toInt(),
+        // The empty desktop's own window spans the whole display and has no caption: counting it reserved a
+        // title's and buttons' width at both screen edges with nothing there.
+        val captioned = apps.filterNot { it.left <= 2 && it.top <= 2 && it.right >= screenW - 2 && it.bottom >= screenH - 2 }
+        val free = FloatingBand.place(captioned, screenW, top, top + h, (FLOAT_EDGE_DP * density).toInt(),
             title, (cfg.floatControlsDp * density).toInt(), if (neededPx > 0) neededPx + chrome else 0, align)
-        val caption = apps.any { it.top < top + h && it.bottom > top }
-        floatNote("free=${free.left}..${free.right} top=$top h=$h need=$neededPx windows=${apps.size} caption=$caption")
+        val caption = captioned.any { it.top < top + h && it.bottom > top }
+        floatNote("free=${free.left}..${free.right} top=$top h=$h need=$neededPx windows=${apps.joinToString(";") { "${it.left},${it.top},${it.right},${it.bottom}" }} caption=$caption")
         return BarSnapshot(FLOATING_ID, Rect(0, top, screenW, top + h), Rect(free.left, top, free.right, top + h), null, if (caption) FLOAT_CAPTION else FLOAT_DESKTOP)
     }
 
@@ -430,8 +433,8 @@ class BarController(private val service: AccessibilityService) {
     private fun setDesktop(on: Boolean) {
         if (DesktopMode.active.value == on) return
         DesktopMode.active.value = on
-        val cfg = Store.config.value
-        if (cfg.hiddenModeNow == HiddenMode.SHOW_ALL && expanded.value) { expanded.value = false; pinned = false }
+        // Items move between the bar and ‹ with the mode: what was opened stays folded.
+        if (expanded.value) { expanded.value = false; pinned = false }
         if (strip.shown) Ticker.refresh()
     }
 
@@ -636,7 +639,7 @@ class BarController(private val service: AccessibilityService) {
         // Presenting (screen sharing): only what matters on stage, whatever its section.
         // While dragging, the bar shows the order the item would land in.
         val items = dragPreview.value?.let { (id, at) -> cfg.items.moved(id, Section.SHOWN, at) } ?: cfg.items
-        val visible = (if (cfg.presenting) items.filter { it.section != Section.OFF && it.type in PRESENTING_TYPES && states[it.id]?.active == true }
+        val visible = (if (cfg.presenting) items.filter { it.sectionNow != Section.OFF && it.type in PRESENTING_TYPES && states[it.id]?.active == true }
         else items.filter { cfg.shows(it, states[it.id]?.active == true) })
             // Next meeting stays at the far left: its text changes width most, and there it moves nothing else.
             .sortedBy { if (it.type == Store.PINNED_LEFT) 0 else 1 }
@@ -644,7 +647,7 @@ class BarController(private val service: AccessibilityService) {
         val hidden = if (cfg.presenting) emptyList() else cfg.behindChevron { states[it.id]?.active == true }
         val overflow by BarOverflow.ids.collectAsState()
         // Without the ‹ button there's no way to fold hidden items back, so they stay folded.
-        val open = expanded.value && cfg.hiddenModeNow != HiddenMode.SHOW_ALL && !cfg.presenting
+        val open = expanded.value && cfg.hiddenMode != HiddenMode.SHOW_ALL && !cfg.presenting
         MeasuredStrip(bias = when (cfg.positionNow) { Position.RIGHT -> 1f; Position.CENTER -> 0f; Position.LEFT -> -1f },
             onWidth = { w -> if (w != strip.params.width || (w <= 0) != stripEmpty) main.post { applyWidth(w) } }) {
             Strip(
@@ -741,7 +744,7 @@ class BarController(private val service: AccessibilityService) {
         override fun chevron(at: Rect) {
             // While presenting, or with nothing behind it (show everything, or ‹ only for items that
             // don't fit), ‹ opens the menu.
-            Store.config.value.let { if (it.presenting || it.hiddenModeNow == HiddenMode.SHOW_ALL || (!expanded.value && hiddenItems().isEmpty())) return chevronContext(at) }
+            Store.config.value.let { if (it.presenting || it.hiddenMode == HiddenMode.SHOW_ALL || (!expanded.value && hiddenItems().isEmpty())) return chevronContext(at) }
             val next = !expanded.value
             expanded.value = next
             pinned = next
@@ -794,7 +797,7 @@ class BarController(private val service: AccessibilityService) {
 
         override fun wheel(up: Boolean) {
             val cfg = Store.config.value
-            if (cfg.presenting || cfg.hiddenModeNow == HiddenMode.SHOW_ALL || hiddenItems().isEmpty()) return
+            if (cfg.presenting || cfg.hiddenMode == HiddenMode.SHOW_ALL || hiddenItems().isEmpty()) return
             if (up != expanded.value) { expanded.value = up; pinned = false }
         }
 
@@ -816,7 +819,7 @@ class BarController(private val service: AccessibilityService) {
             hovering = inside
             main.removeCallbacks(expandOnHover); main.removeCallbacks(collapse)
             if (inside) {
-                if (Store.config.value.hiddenModeNow == HiddenMode.HOVER && !expanded.value && hiddenItems().isNotEmpty()) main.postDelayed(expandOnHover, 350)
+                if (Store.config.value.hiddenMode == HiddenMode.HOVER && !expanded.value && hiddenItems().isNotEmpty()) main.postDelayed(expandOnHover, 350)
             } else if (!pinned) main.postDelayed(collapse, 900)
             else {
                 val secs = Store.config.value.autoCollapseSec

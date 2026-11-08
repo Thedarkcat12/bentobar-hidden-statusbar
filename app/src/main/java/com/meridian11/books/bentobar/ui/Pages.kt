@@ -57,7 +57,7 @@ import com.meridian11.books.bentobar.data.ChipMode
 import com.meridian11.books.bentobar.data.ColorMode
 import com.meridian11.books.bentobar.data.DesktopAlign
 import com.meridian11.books.bentobar.data.MAX_OFFSET_Y_DP
-import com.meridian11.books.bentobar.data.MIN_POPUP_OPACITY
+import com.meridian11.books.bentobar.data.MIN_POPUP_OPAQUE
 import com.meridian11.books.bentobar.data.Pill
 import com.meridian11.books.bentobar.data.Position
 import com.meridian11.books.bentobar.data.Section
@@ -178,8 +178,6 @@ fun LookPage() {
             ChoiceRow(stringResource(R.string.floating_align), listOf(DesktopAlign.SAME to stringResource(R.string.floating_align_same),
                 DesktopAlign.RIGHT to stringResource(R.string.floating_align_right), DesktopAlign.CENTER to stringResource(R.string.floating_align_center),
                 DesktopAlign.LEFT to stringResource(R.string.floating_align_left)), cfg.desktopAlign) { v -> Store.update { it.copy(desktopAlign = v) } }
-            SwitchRow(stringResource(R.string.floating_unhide), cfg.desktopShowAll, help = stringResource(R.string.floating_unhide_help),
-                enabled = cfg.hiddenMode != HiddenMode.SHOW_ALL) { on -> Store.update { it.copy(desktopShowAll = on) } }
             SliderRow(stringResource(R.string.floating_offset_desktop), cfg.desktopOffsetYDp, 0..MAX_OFFSET_Y_DP, { "$it dp" }) { v -> Store.update { it.copy(desktopOffsetYDp = v) } }
             SwitchRow(stringResource(R.string.floating_overlap), cfg.desktopOverlap, help = stringResource(R.string.floating_overlap_help)) { on ->
                 Store.update { it.copy(desktopOverlap = on) }
@@ -209,8 +207,8 @@ fun LookPage() {
         SwitchRow(stringResource(R.string.look_no_animations), cfg.noAnimations, help = stringResource(R.string.look_no_animations_help)) { on ->
             Store.update { it.copy(noAnimations = on) }
         }
-        SliderRow(stringResource(R.string.popup_opacity), cfg.popupOpacity.coerceIn(MIN_POPUP_OPACITY, 100), MIN_POPUP_OPACITY..100, { "$it%" }) { v ->
-            Store.update { it.copy(popupOpacity = v) }
+        SliderRow(stringResource(R.string.popup_opacity), cfg.popupOpaque.coerceIn(MIN_POPUP_OPAQUE, 100), MIN_POPUP_OPAQUE..100, { "$it%" }) { v ->
+            Store.update { it.copy(popupOpaque = v) }
         }
         SwitchRow(stringResource(R.string.look_system_tint), cfg.systemTint, help = stringResource(R.string.look_system_tint_help)) { on ->
             Store.update { it.copy(systemTint = on) }

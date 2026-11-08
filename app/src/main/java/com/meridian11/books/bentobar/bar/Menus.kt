@@ -34,7 +34,8 @@ import com.meridian11.books.bentobar.R
 import com.meridian11.books.bentobar.data.Display
 import com.meridian11.books.bentobar.data.ItemConfig
 import com.meridian11.books.bentobar.data.Section
-import com.meridian11.books.bentobar.data.MIN_POPUP_OPACITY
+import com.meridian11.books.bentobar.data.sectionNow
+import com.meridian11.books.bentobar.data.popupAlpha
 import com.meridian11.books.bentobar.data.Store
 import com.meridian11.books.bentobar.data.notDrawn
 import com.meridian11.books.bentobar.items.Items
@@ -72,7 +73,7 @@ fun MenuSurface(width: Dp, maxHeight: Dp, glass: MenuGlassState?, content: @Comp
         // container (onSecondary in dark theme): a tint, not a wash, and 0.04 more of it so text stays as readable.
         val conf = Store.config.collectAsState().value
         val tint = conf.systemTint
-        val opacity = conf.popupOpacity.coerceIn(MIN_POPUP_OPACITY, 100) / 100f
+        val opaque = conf.popupOpaque
         val hue = if (dark) scheme.onSecondary else scheme.secondaryContainer
         val look = GlassLook(
             veil = (when {
@@ -80,7 +81,7 @@ fun MenuSurface(width: Dp, maxHeight: Dp, glass: MenuGlassState?, content: @Comp
                 g.blur -> scheme.surfaceContainerLowest.copy(alpha = if (dark) 0.62f else 0.56f)
                 tint -> lerp(scheme.surfaceContainerHigh, hue, 0.5f)
                 else -> scheme.surfaceContainerHigh
-            }).let { it.copy(alpha = it.alpha * opacity) },
+            }).let { it.copy(alpha = popupAlpha(it.alpha, opaque)) },
             rim = Color.White.copy(alpha = if (dark) 0.44f else 0.80f),
             hairline = Color.Black.copy(alpha = if (dark) 0.28f else 0.20f),
             dark = dark,
@@ -197,7 +198,7 @@ fun BentoBarMenu(host: MenuHost, openItem: (ItemConfig) -> Unit, hideBar: () -> 
     // Worked out here, not when the menu opened, so an item popping out (or in) updates the list.
     val cfg by Store.config.collectAsState()
     val overflow by com.meridian11.books.bentobar.bar.BarOverflow.ids.collectAsState()
-    val hidden = if (everything) cfg.items.filter { it.section != Section.OFF }
+    val hidden = if (everything) cfg.items.filter { it.sectionNow != Section.OFF }
     else cfg.notDrawn { states[it.id]?.active == true }.let { waiting -> cfg.items.filter { it in waiting || it.id in overflow } }
     val first = remember { androidx.compose.ui.focus.FocusRequester() }
     if (everything) androidx.compose.runtime.LaunchedEffect(Unit) { runCatching { first.requestFocus() } }

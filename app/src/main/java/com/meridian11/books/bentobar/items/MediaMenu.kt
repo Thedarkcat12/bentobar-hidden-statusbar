@@ -69,6 +69,7 @@ import com.meridian11.books.bentobar.ui.Meter
 import com.meridian11.books.bentobar.ui.SectionLabel
 import com.meridian11.books.bentobar.ui.Setup
 import com.meridian11.books.bentobar.ui.SliderRow
+import com.meridian11.books.bentobar.ui.SwitchRow
 import com.meridian11.books.bentobar.ui.SmallIconButton
 import com.meridian11.books.bentobar.ui.drawIn
 import com.meridian11.books.bentobar.ui.fadeIn
@@ -310,6 +311,12 @@ internal fun MediaOptions(item: ItemConfig, set: (ItemConfig) -> Unit) {
     }
     SliderRow(stringResource(R.string.event_longest_title), MediaText.chars(item.options), MediaText.CHARS,
         { resources.getQuantityString(R.plurals.event_characters, it, it) }) { set(item.with(MediaText.OPTION_CHARS, it.toString())) }
+    SwitchRow(stringResource(R.string.media_art), MediaText.art(item.options), help = stringResource(R.string.media_art_help)) {
+        set(item.with(MediaText.OPTION_ART, it.toString()))
+    }
+    SwitchRow(stringResource(R.string.media_wave), MediaText.wave(item.options), help = stringResource(R.string.media_wave_help)) {
+        set(item.with(MediaText.OPTION_WAVE, it.toString()))
+    }
     ChoiceRow(stringResource(R.string.media_click), listOf(MediaText.CLICK_MENU to stringResource(R.string.media_click_menu),
         MediaText.CLICK_TOGGLE to stringResource(R.string.media_click_toggle)),
         if (MediaText.toggles(item.options)) MediaText.CLICK_TOGGLE else MediaText.CLICK_MENU) { set(item.with(MediaText.OPTION_CLICK, it)) }

@@ -43,6 +43,8 @@ data class ItemConfig(
     val whenActive: Boolean = false,
     val display: Display = Display.ICON_AND_TEXT,
     val options: Map<String, String> = emptyMap(),
+    /** Where the item lives while Desktop Mode is active: [DesktopWhere.SAME] (as [section]), or a section of its own. */
+    val desktop: DesktopWhere = DesktopWhere.SAME,
 ) {
     fun opt(key: String, default: String) = options[key] ?: default
     fun optInt(key: String, default: Int) = options[key]?.toIntOrNull() ?: default
@@ -107,8 +109,8 @@ data class BarConfig(
     val noAnimations: Boolean = false,
     /** "Tint with system colors": the popups' glass takes a tint of the system's (wallpaper's) palette. Off: neutral glass. */
     val systemTint: Boolean = false,
-    /** How much of the popups' own veil (or solid card) is drawn, in percent: 100 is the standard look, less lets more of the screen show through. */
-    val popupOpacity: Int = 100,
+    /** How solid the popups are, in percent: 50 is the look they were made with, 100 a solid card, less lets more of the screen show through. */
+    val popupOpaque: Int = DEFAULT_POPUP_OPAQUE,
     /**
      * Desktop Mode: with no status bar at all (a tablet's desktop windowing keeps its clock and icons in a taskbar),
      * float along the top of the screen instead of going away. Full-screen apps still hide it. Off by default: where
@@ -120,8 +122,6 @@ data class BarConfig(
     val floatTitleDp: Int = 200,
     /** Desktop Mode: dp kept clear at the right end of a window's caption (its buttons, with room for one more). */
     val floatControlsDp: Int = 220,
-    /** Desktop Mode: Hidden items show as under Show everything (those with a "Show when" rule still wait for it). */
-    val desktopShowAll: Boolean = false,
     /** Desktop Mode: where the strip sits, or [DesktopAlign.SAME]: as in [position]. */
     val desktopAlign: DesktopAlign = DesktopAlign.SAME,
     /** Desktop Mode: when the strip doesn't fit beside a window's buttons, cover the icon and name instead of dropping items. */
@@ -167,6 +167,16 @@ object Uses {
 @Serializable
 enum class HiddenMode { SHOW_ALL, CLICK, HOVER }
 
+/** An item's own place while Desktop Mode is active. */
+@Serializable
+enum class DesktopWhere { SAME, SHOWN, HIDDEN, OFF }
+
+/** The section this item is in right now: its own while Desktop Mode is active and it has one, else [ItemConfig.section]. */
+val ItemConfig.sectionNow: Section get() = when {
+    !DesktopMode.active.value -> section
+    else -> when (desktop) { DesktopWhere.SAME -> section; DesktopWhere.SHOWN -> Section.SHOWN; DesktopWhere.HIDDEN -> Section.HIDDEN; DesktopWhere.OFF -> Section.OFF }
+}
+
 /** Where the strip sits while Desktop Mode is active: as usual, or one of the three places. */
 @Serializable
 enum class DesktopAlign {
@@ -176,15 +186,12 @@ enum class DesktopAlign {
 
 /**
  * Whether the strip is floating with no status bar right now: the Desktop Mode settings apply only then.
- * Set by the controller as it looks at the windows; read through [hiddenModeNow] and [positionNow] so that the
+ * Set by the controller as it looks at the windows; read through [sectionNow] and [positionNow] so that the
  * strip, the ticker and the menus all follow one rule.
  */
 object DesktopMode {
     val active = kotlinx.coroutines.flow.MutableStateFlow(false)
 }
-
-/** How hidden items work right now: Show everything while Desktop Mode is active and asks for it, else [BarConfig.hiddenMode]. */
-val BarConfig.hiddenModeNow: HiddenMode get() = if (desktopShowAll && DesktopMode.active.value) HiddenMode.SHOW_ALL else hiddenMode
 
 /** Where the strip sits right now: [BarConfig.desktopAlign] while Desktop Mode is active, else [BarConfig.position]. */
 val BarConfig.positionNow: Position get() = if (DesktopMode.active.value) desktopAlign.resolve(position) else position
@@ -192,8 +199,21 @@ val BarConfig.positionNow: Position get() = if (DesktopMode.active.value) deskto
 /** How far below the top of the screen the strip sits right now, in dp. */
 val BarConfig.offsetYNowDp: Int get() = (if (DesktopMode.active.value) desktopOffsetYDp else offsetYDp).coerceIn(0, MAX_OFFSET_Y_DP)
 
-/** The least of the popups' veil that can be drawn, in percent: below this, text on them stops being readable. */
-const val MIN_POPUP_OPACITY = 30
+/** The least solid the popups can be, in percent: below this, text on them stops being readable. */
+const val MIN_POPUP_OPAQUE = 20
+
+/** The popups' opacity as they were made (the first setting's 50%). */
+const val DEFAULT_POPUP_OPAQUE = 50
+
+/**
+ * The alpha of a popup's veil that is [base] at the standard look, at [percent] solid: 50 is [base] itself, less fades it
+ * toward nothing, more takes it toward a fully solid card at 100.
+ */
+fun popupAlpha(base: Float, percent: Int): Float {
+    val p = percent.coerceIn(MIN_POPUP_OPAQUE, 100)
+    return if (p <= DEFAULT_POPUP_OPAQUE) base * p / DEFAULT_POPUP_OPAQUE
+    else base + (1f - base) * (p - DEFAULT_POPUP_OPAQUE) / (100 - DEFAULT_POPUP_OPAQUE)
+}
 
 /** The most the strip can be moved down, in dp. */
 const val MAX_OFFSET_Y_DP = 64
@@ -210,9 +230,9 @@ fun BarConfig.migrateToV3(): BarConfig = if (version >= 3) this else copy(
 )
 
 /** Whether an item in the bar config is drawn right now (outside presenting), for the strip and the preview. */
-fun BarConfig.shows(item: ItemConfig, active: Boolean): Boolean = when (item.section) {
+fun BarConfig.shows(item: ItemConfig, active: Boolean): Boolean = when (item.sectionNow) {
     Section.SHOWN -> true
-    Section.HIDDEN -> if (hiddenModeNow == HiddenMode.SHOW_ALL) !item.whenActive || active else item.whenActive && active
+    Section.HIDDEN -> if (hiddenMode == HiddenMode.SHOW_ALL) !item.whenActive || active else item.whenActive && active
     Section.OFF -> false
 }
 
@@ -221,14 +241,14 @@ fun BarConfig.shows(item: ItemConfig, active: Boolean): Boolean = when (item.sec
  * ones that aren't out on their own. The strip, the settings preview and the controller all ask here.
  */
 fun BarConfig.behindChevron(active: (ItemConfig) -> Boolean): List<ItemConfig> =
-    if (hiddenModeNow == HiddenMode.SHOW_ALL) emptyList() else items.filter { it.section == Section.HIDDEN && !shows(it, active(it)) }
+    if (hiddenMode == HiddenMode.SHOW_ALL) emptyList() else items.filter { it.sectionNow == Section.HIDDEN && !shows(it, active(it)) }
 
 /**
  * The items the ‹ menu lists as hidden: in the layout but not drawn right now. Under Show everything
  * that's a rule item waiting for its rule, never a hidden item that is drawn.
  */
 fun BarConfig.notDrawn(active: (ItemConfig) -> Boolean): List<ItemConfig> =
-    items.filter { it.section != Section.OFF && !shows(it, active(it)) }
+    items.filter { it.sectionNow != Section.OFF && !shows(it, active(it)) }
 
 /** Whether [shows] can be true for [item] once its "Show when" rule applies: the items worth sampling. */
 fun BarConfig.couldShow(item: ItemConfig): Boolean = shows(item, active = true)

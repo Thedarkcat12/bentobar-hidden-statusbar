@@ -96,6 +96,8 @@ data class ItemState(
      * changes. Null: none.
      */
     val turns: List<String>? = null,
+    /** A small wavy line beside the icon, moving while music plays (Now playing's option). */
+    val wave: Boolean = false,
 ) {
     /** For logs and dumps: never the words themselves, which can be a track's title, a city or a flight. */
     override fun toString() = "ItemState(icon=${icon != null}, text of ${text?.length ?: 0}, active=$active, tone=$tone)"

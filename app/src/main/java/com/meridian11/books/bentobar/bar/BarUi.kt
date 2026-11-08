@@ -649,13 +649,18 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, gl
         if (showIcon) {
             val img = s.image
             if (img != null) {
-                Image(img.asImageBitmap(), null, Modifier.size(look.iconSp.value.dp),
+                Image(img.asImageBitmap(), null,
+                    Modifier.size(look.iconSp.value.dp).let { if (entry.item.type == "media") it.clip(RoundedCornerShape(3.dp)) else it },
                     colorFilter = if (entry.item.optBool("mono", true) && entry.item.type == "app") ColorFilter.tint(color) else null)
             } else if (s.dayNumber != null) {
                 DayBadge(s.dayNumber, look.iconSp, color, look.background)
             } else if (s.icon != null && s.icon.isNotEmpty()) {
                 SymIcon(s.icon, size = look.iconSp, filled = s.filled, color = color)
             }
+        }
+        if (s.wave && showIcon) {
+            Spacer(Modifier.width(4.dp))
+            WaveLine(color, look.iconSp.value.dp)
         }
         if (showIcon && (showText || slider != null) && (s.image != null || !s.icon.isNullOrEmpty())) Spacer(Modifier.width(5.dp))
         if (slider != null) {
@@ -676,6 +681,36 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, gl
                 modifier = (if (slot != null) Modifier.widthIn(min = with(density) { slot.toDp() }) else Modifier).widthIn(max = cap),
                 style = textStyle)
         }
+    }
+}
+
+/**
+ * Now playing's wavy line: a small sine that travels while music plays, [height] tall and a little wider. With
+ * "No animations" (or the system's Remove animations) it stands still.
+ */
+@Composable
+private fun WaveLine(color: Color, height: Dp) {
+    val moving = !Motion.off
+    // Standing still, nothing runs: no frame is asked for.
+    val travel: androidx.compose.runtime.State<Float> = if (moving) androidx.compose.animation.core.rememberInfiniteTransition(label = "wave").animateFloat(
+        0f, 1f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1400, easing = androidx.compose.animation.core.LinearEasing)),
+        label = "travel") else remember { mutableStateOf(0f) }
+    Canvas(Modifier.size(width = height * 1.4f, height = height)) {
+        val stroke = 1.6.dp.toPx()
+        val mid = size.height / 2
+        val amp = (size.height / 2 - stroke).coerceAtLeast(1f)
+        val shift = if (moving) travel.value * 2f * Math.PI.toFloat() else 0f
+        val path = androidx.compose.ui.graphics.Path()
+        val steps = 24
+        for (i in 0..steps) {
+            val x = size.width * i / steps
+            // One and a half waves across, fading in from the left so the ends don't bunch against the icon and the words.
+            val edge = kotlin.math.sin(Math.PI.toFloat() * i / steps)
+            val y = mid + amp * edge * kotlin.math.sin(3f * Math.PI.toFloat() * i / steps - shift)
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        drawPath(path, color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round,
+            join = androidx.compose.ui.graphics.StrokeJoin.Round))
     }
 }
 

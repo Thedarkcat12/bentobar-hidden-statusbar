@@ -76,9 +76,9 @@ class ImportTest {
         // the three online switches are kept elsewhere (Online); a new field here should be a decision, so it is listed.
         val fields = (0 until BarConfig.serializer().descriptor.elementsCount).map { BarConfig.serializer().descriptor.getElementName(it) }.toSet()
         assertEquals(setOf("version", "enabled", "items", "position", "hiddenMode", "chevron", "revealOnHover", "autoCollapseSec", "pinnedOpen",
-            "presenting", "turnedOff", "textSize", "pill", "color", "spacing", "hoverSwitchesPopups", "noAnimations", "systemTint", "popupOpacity", "floatWithoutBar", "floatTitleDp", "floatControlsDp", "desktopShowAll", "desktopAlign", "desktopOverlap", "offsetYDp", "desktopOffsetYDp", "chipMode", "onboarded", "cities"), fields)
+            "presenting", "turnedOff", "textSize", "pill", "color", "spacing", "hoverSwitchesPopups", "noAnimations", "systemTint", "popupOpaque", "floatWithoutBar", "floatTitleDp", "floatControlsDp", "desktopAlign", "desktopOverlap", "offsetYDp", "desktopOffsetYDp", "chipMode", "onboarded", "cities"), fields)
         val item = (0 until ItemConfig.serializer().descriptor.elementsCount).map { ItemConfig.serializer().descriptor.getElementName(it) }.toSet()
-        assertEquals(setOf("id", "type", "section", "whenActive", "display", "options"), item)
+        assertEquals(setOf("id", "type", "section", "whenActive", "display", "options", "desktop"), item)
     }
 
     @Test fun anOlderLayoutIsMigrated() {
