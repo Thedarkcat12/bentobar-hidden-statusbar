@@ -108,15 +108,26 @@ data class BarConfig(
     /** "Tint with system colors": the popups' glass takes a tint of the system's (wallpaper's) palette. Off: neutral glass. */
     val systemTint: Boolean = false,
     /**
-     * With no status bar at all (a tablet's PC mode keeps its clock and icons in a taskbar), float along the
-     * top of the screen instead of going away. Full-screen apps still hide it. Off by default: where a device keeps
-     * a taskbar while an app is full screen, the strip would stay over that app, as it never did.
+     * Desktop Mode: with no status bar at all (a tablet's desktop windowing keeps its clock and icons in a taskbar),
+     * float along the top of the screen instead of going away. Full-screen apps still hide it. Off by default: where
+     * a device keeps a taskbar while an app is full screen, the strip would stay over that app, as it never did.
+     * (The name is from before it was called Desktop Mode: saved layouts hold it.)
      */
     val floatWithoutBar: Boolean = false,
-    /** Floating: dp kept clear at the left end of a window's caption (its icon and name). */
+    /** Desktop Mode: dp kept clear at the left end of a window's caption (its icon and name). */
     val floatTitleDp: Int = 200,
-    /** Floating: dp kept clear at the right end of a window's caption (its buttons, with room for one more). */
+    /** Desktop Mode: dp kept clear at the right end of a window's caption (its buttons, with room for one more). */
     val floatControlsDp: Int = 220,
+    /** Desktop Mode: Hidden items show as under Show everything (those with a "Show when" rule still wait for it). */
+    val desktopShowAll: Boolean = false,
+    /** Desktop Mode: where the strip sits, or [DesktopAlign.SAME]: as in [position]. */
+    val desktopAlign: DesktopAlign = DesktopAlign.SAME,
+    /** Desktop Mode: when the strip doesn't fit beside a window's buttons, cover the icon and name instead of dropping items. */
+    val desktopOverlap: Boolean = false,
+    /** How far below the top of the screen the strip sits, in dp. */
+    val offsetYDp: Int = 0,
+    /** The same, while Desktop Mode is active. */
+    val desktopOffsetYDp: Int = 0,
     /**
      * Mirror the running timer or next meeting as an Android Live Update chip: FALLBACK only
      * while BentoBar's own bar isn't showing (accessibility off, or hidden with the tile).
@@ -154,6 +165,34 @@ object Uses {
 @Serializable
 enum class HiddenMode { SHOW_ALL, CLICK, HOVER }
 
+/** Where the strip sits while Desktop Mode is active: as usual, or one of the three places. */
+@Serializable
+enum class DesktopAlign {
+    SAME, RIGHT, CENTER, LEFT;
+    fun resolve(regular: Position): Position = when (this) { SAME -> regular; RIGHT -> Position.RIGHT; CENTER -> Position.CENTER; LEFT -> Position.LEFT }
+}
+
+/**
+ * Whether the strip is floating with no status bar right now: the Desktop Mode settings apply only then.
+ * Set by the controller as it looks at the windows; read through [hiddenModeNow] and [positionNow] so that the
+ * strip, the ticker and the menus all follow one rule.
+ */
+object DesktopMode {
+    val active = kotlinx.coroutines.flow.MutableStateFlow(false)
+}
+
+/** How hidden items work right now: Show everything while Desktop Mode is active and asks for it, else [BarConfig.hiddenMode]. */
+val BarConfig.hiddenModeNow: HiddenMode get() = if (desktopShowAll && DesktopMode.active.value) HiddenMode.SHOW_ALL else hiddenMode
+
+/** Where the strip sits right now: [BarConfig.desktopAlign] while Desktop Mode is active, else [BarConfig.position]. */
+val BarConfig.positionNow: Position get() = if (DesktopMode.active.value) desktopAlign.resolve(position) else position
+
+/** How far below the top of the screen the strip sits right now, in dp. */
+val BarConfig.offsetYNowDp: Int get() = (if (DesktopMode.active.value) desktopOffsetYDp else offsetYDp).coerceIn(0, MAX_OFFSET_Y_DP)
+
+/** The most the strip can be moved down, in dp. */
+const val MAX_OFFSET_Y_DP = 64
+
 /**
  * Version 3 replaced the ‹ switch and "reveal on hover" with [HiddenMode]. With ‹ off, a hidden
  * item without a rule never showed; under SHOW_ALL it would, so those move to Off and the bar looks
@@ -168,7 +207,7 @@ fun BarConfig.migrateToV3(): BarConfig = if (version >= 3) this else copy(
 /** Whether an item in the bar config is drawn right now (outside presenting), for the strip and the preview. */
 fun BarConfig.shows(item: ItemConfig, active: Boolean): Boolean = when (item.section) {
     Section.SHOWN -> true
-    Section.HIDDEN -> if (hiddenMode == HiddenMode.SHOW_ALL) !item.whenActive || active else item.whenActive && active
+    Section.HIDDEN -> if (hiddenModeNow == HiddenMode.SHOW_ALL) !item.whenActive || active else item.whenActive && active
     Section.OFF -> false
 }
 
@@ -177,7 +216,7 @@ fun BarConfig.shows(item: ItemConfig, active: Boolean): Boolean = when (item.sec
  * ones that aren't out on their own. The strip, the settings preview and the controller all ask here.
  */
 fun BarConfig.behindChevron(active: (ItemConfig) -> Boolean): List<ItemConfig> =
-    if (hiddenMode == HiddenMode.SHOW_ALL) emptyList() else items.filter { it.section == Section.HIDDEN && !shows(it, active(it)) }
+    if (hiddenModeNow == HiddenMode.SHOW_ALL) emptyList() else items.filter { it.section == Section.HIDDEN && !shows(it, active(it)) }
 
 /**
  * The items the ‹ menu lists as hidden: in the layout but not drawn right now. Under Show everything

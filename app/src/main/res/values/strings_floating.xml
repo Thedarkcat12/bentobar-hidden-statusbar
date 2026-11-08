@@ -1,8 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Floating without a status bar (a tablet's PC mode). Every name here starts with floating_. -->
+<!-- Desktop Mode: no status bar (a tablet's desktop windowing). Every name here starts with floating_. -->
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
-    <string name="floating_switch">Stay on screen without a status bar</string>
-    <string name="floating_switch_help">In PC mode the clock and icons move to a taskbar. BentoBar then floats along the top of the screen, beside each window\'s title bar, and still hides for full-screen apps.</string>
+    <string name="floating_switch">Desktop Mode</string>
+    <string name="floating_switch_help">In Desktop Mode, BentoBar dynamically adjusts to fit within the top bar of floating windows alongside the icon and name of the app, and the minimize, close, and, maximize buttons whenever it would obstruct them. This is to be used when the system hides or disables the status bar at the top of the screen in its desktop windowing mode.</string>
     <string name="floating_title">Keep clear at a window\'s left</string>
     <string name="floating_controls">Keep clear at a window\'s right</string>
+    <string name="floating_unhide">Show hidden items in Desktop Mode</string>
+    <string name="floating_unhide_help">While Desktop Mode is active, items in Hidden show in the bar as under Show everything. Items with a Show when rule still wait for it.</string>
+    <string name="floating_align">Desktop Mode alignment</string>
+    <string name="floating_align_same">Same as usual</string>
+    <string name="floating_align_right">Right</string>
+    <string name="floating_align_center">Center</string>
+    <string name="floating_align_left">Left</string>
+    <string name="floating_overlap">Cover window titles</string>
+    <string name="floating_overlap_help">When BentoBar doesn\'t fit beside a window\'s buttons, it covers the app\'s icon and name instead of dropping items. It never covers the buttons.</string>
+    <string name="floating_offset">Distance from the top</string>
+    <string name="floating_offset_desktop">Distance from the top in Desktop Mode</string>
 </resources>

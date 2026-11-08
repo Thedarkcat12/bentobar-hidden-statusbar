@@ -32,7 +32,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import com.meridian11.books.bentobar.data.ColorMode
+import com.meridian11.books.bentobar.data.DesktopMode
 import com.meridian11.books.bentobar.data.HiddenMode
+import com.meridian11.books.bentobar.data.MAX_OFFSET_Y_DP
+import com.meridian11.books.bentobar.data.hiddenModeNow
+import com.meridian11.books.bentobar.data.offsetYNowDp
+import com.meridian11.books.bentobar.data.positionNow
 import com.meridian11.books.bentobar.data.shows
 import com.meridian11.books.bentobar.data.behindChevron
 import com.meridian11.books.bentobar.data.moved
@@ -229,7 +234,7 @@ class BarController(private val service: AccessibilityService) {
     fun start() {
         started = true
         // Pinned open with ‹ before a restart: open again.
-        Store.config.value.let { if (it.pinnedOpen && it.hiddenMode != HiddenMode.SHOW_ALL) { expanded.value = true; pinned = true } }
+        Store.config.value.let { if (it.pinnedOpen && it.hiddenModeNow != HiddenMode.SHOW_ALL) { expanded.value = true; pinned = true } }
         service.registerReceiver(screen, IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_ON); addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_USER_PRESENT)
         })
@@ -252,6 +257,7 @@ class BarController(private val service: AccessibilityService) {
         started = false
         BarLook.current.value = null
         BarStatus.current.value = BarStatus.STOPPED
+        DesktopMode.active.value = false
         BarOverflow.ids.value = emptySet()
         runCatching { service.unregisterReceiver(screen) }
         runCatching { WallpaperManager.getInstance(service).removeOnColorsChangedListener(wallpaper) }
@@ -297,7 +303,7 @@ class BarController(private val service: AccessibilityService) {
         // Colour back to "Match the status bar": read the bar again (nothing else would until it changes).
         Store.config.value.color.let { if (it != lastColor) { if (it == ColorMode.AUTO && lastColor != null) readSoon(ColorWatch.Cause.QUICK, 100); lastColor = it } }
         // Switched to Show everything (or presenting) with hidden items out: nothing can fold them back.
-        Store.config.value.let { if ((it.hiddenMode == HiddenMode.SHOW_ALL || it.presenting) && expanded.value) { expanded.value = false; pinned = false } }
+        Store.config.value.let { if ((it.hiddenModeNow == HiddenMode.SHOW_ALL || it.presenting) && expanded.value) { expanded.value = false; pinned = false } }
         applyLook()
         if (Ticker.running) Ticker.refresh()
         scan()
@@ -339,6 +345,7 @@ class BarController(private val service: AccessibilityService) {
         }
         val newWindow = s?.windowId != snap?.windowId
         snap = s
+        setDesktop(s?.windowId == FLOATING_ID)
         val cfg = Store.config.value
         // On tablets the shade and Quick Settings slide over the status bar; our overlay would sit
         // on top of them. Only a big system window counts: on the desktop bar the panels open as
@@ -404,11 +411,28 @@ class BarController(private val service: AccessibilityService) {
             return null
         }
         val h = if (inset > 0) inset else (FLOAT_HEIGHT_DP * density).toInt()
-        val free = FloatingBand.free(apps, screenW, h, (FLOAT_EDGE_DP * density).toInt(),
-            (cfg.floatTitleDp * density).toInt(), (cfg.floatControlsDp * density).toInt())
-        val caption = apps.any { it.top < h && it.bottom > 0 }
-        floatNote("free=${free.left}..${free.right} h=$h windows=${apps.size} caption=$caption")
-        return BarSnapshot(FLOATING_ID, Rect(0, 0, screenW, h), Rect(free.left, 0, free.right, h), null, if (caption) FLOAT_CAPTION else FLOAT_DESKTOP)
+        // Desktop Mode's own alignment and offset: this runs before DesktopMode.active is set for this look.
+        val top = (cfg.desktopOffsetYDp.coerceIn(0, MAX_OFFSET_Y_DP) * density).toInt()
+        val align = cfg.desktopAlign.resolve(cfg.position)
+        val title = if (cfg.desktopOverlap) 0 else (cfg.floatTitleDp * density).toInt()
+        val chrome = if (cfg.pill == Pill.NONE) 2 * (6 * density).toInt() else 2 * (6 * density).toInt() + 2 * (STRIP_PILL_PADDING.value * density).toInt()
+        val free = FloatingBand.place(apps, screenW, top, top + h, (FLOAT_EDGE_DP * density).toInt(),
+            title, (cfg.floatControlsDp * density).toInt(), if (neededPx > 0) neededPx + chrome else 0, align)
+        val caption = apps.any { it.top < top + h && it.bottom > top }
+        floatNote("free=${free.left}..${free.right} top=$top h=$h need=$neededPx windows=${apps.size} caption=$caption")
+        return BarSnapshot(FLOATING_ID, Rect(0, top, screenW, top + h), Rect(free.left, top, free.right, top + h), null, if (caption) FLOAT_CAPTION else FLOAT_DESKTOP)
+    }
+
+    /** The width the strip would like (its items and gaps, in px), as the strip last measured it; 0 before it has. */
+    private var neededPx = 0
+
+    /** Desktop Mode's settings apply while the strip floats; when that changes, what shows and where follow. */
+    private fun setDesktop(on: Boolean) {
+        if (DesktopMode.active.value == on) return
+        DesktopMode.active.value = on
+        val cfg = Store.config.value
+        if (cfg.hiddenModeNow == HiddenMode.SHOW_ALL && expanded.value) { expanded.value = false; pinned = false }
+        if (strip.shown) Ticker.refresh()
     }
 
     private var lastFloatNote = ""
@@ -420,25 +444,40 @@ class BarController(private val service: AccessibilityService) {
     private var lastPlace = ""
     private fun trace(what: String) { if (tracing) Log.i(tag, "trace ${SystemClock.uptimeMillis() % 100_000} $what") }
 
+    /** The manual drop from the top of the screen, on a real status bar; a floating strip has it in its band already. */
+    private fun offsetY(s: BarSnapshot): Int =
+        if (s.windowId == FLOATING_ID) 0 else (Store.config.value.offsetYNowDp * density).toInt()
+
     private fun place(s: BarSnapshot, screenW: Int) {
         val cfg = Store.config.value
         val gap = (6 * density).toInt()
         val p = strip.params
         p.height = s.bar.height()
-        p.y = s.bar.top
+        p.y = s.bar.top + offsetY(s)
+        val floating = s.windowId == FLOATING_ID
         // Without a pill the strip's ends are only room for the highlight's round ends: the window reaches that much
         // further out, into the gap, so the items stay 6 dp from the free area's edges as they always were.
         val ends = (STRIP_PILL_PADDING.value * density).toInt()
         val out = if (cfg.pill == Pill.NONE) ends else 0
-        when (cfg.position) {
-            Position.RIGHT -> { p.gravity = Gravity.TOP or Gravity.RIGHT; p.x = screenW - s.free.right + gap - out }
-            Position.LEFT -> { p.gravity = Gravity.TOP or Gravity.LEFT; p.x = s.free.left + gap - out }
-            Position.CENTER -> { p.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL; p.x = s.free.centerX() - screenW / 2 }
+        // Floating, a stretch that reaches the screen's side is flush with it; elsewhere the items keep their gap.
+        val gapL = if (floating && s.free.left <= 0) 0 else gap
+        val gapR = if (floating && s.free.right >= screenW) 0 else gap
+        val outL = if (floating && s.free.left <= 0) ends else out
+        val outR = if (floating && s.free.right >= screenW) ends else out
+        val width = strip.params.width
+        when (cfg.positionNow) {
+            Position.RIGHT -> { p.gravity = Gravity.TOP or Gravity.RIGHT; p.x = screenW - s.free.right + gapR - outR }
+            Position.LEFT -> { p.gravity = Gravity.TOP or Gravity.LEFT; p.x = s.free.left + gapL - outL }
+            Position.CENTER -> {
+                p.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                p.x = if (floating && width > 0) (screenW / 2).coerceIn(s.free.left + width / 2, maxOf(s.free.left + width / 2, s.free.right - width / 2)) - screenW / 2
+                else s.free.centerX() - screenW / 2
+            }
         }
         // The whole strip fits the free area: items, the pill's own padding and (decided by the strip,
         // from what fits) room for ‹.
         val pillPad = if (cfg.pill == Pill.NONE) 0 else 2 * ends
-        maxWidth.intValue = (s.free.width() - 2 * gap - pillPad).coerceAtLeast(0)
+        maxWidth.intValue = (s.free.width() - gapL - gapR - pillPad).coerceAtLeast(0)
         heightDp.value = (s.bar.height() / density).dp
         val where = "free=${s.free.toShortString()} x=${p.x} maxW=${maxWidth.intValue} [${s.summary}]"
         if (where != lastPlace) { trace("place $where"); lastPlace = where }
@@ -589,6 +628,9 @@ class BarController(private val service: AccessibilityService) {
     @Composable
     private fun StripHost() {
         val cfg by Store.config.collectAsState()
+        // Read so that this recomposes when Desktop Mode comes or goes: cfg's effective values depend on it.
+        val desktop by DesktopMode.active.collectAsState()
+        val inDesktop = desktop
         val states by Ticker.states.collectAsState()
         val entries = { list: List<ItemConfig> -> list.map { StripEntry(it, states[it.id] ?: Ticker.placeholder(it)) } }
         // Presenting (screen sharing): only what matters on stage, whatever its section.
@@ -602,8 +644,8 @@ class BarController(private val service: AccessibilityService) {
         val hidden = if (cfg.presenting) emptyList() else cfg.behindChevron { states[it.id]?.active == true }
         val overflow by BarOverflow.ids.collectAsState()
         // Without the ‹ button there's no way to fold hidden items back, so they stay folded.
-        val open = expanded.value && cfg.hiddenMode != HiddenMode.SHOW_ALL && !cfg.presenting
-        MeasuredStrip(bias = when (cfg.position) { Position.RIGHT -> 1f; Position.CENTER -> 0f; Position.LEFT -> -1f },
+        val open = expanded.value && cfg.hiddenModeNow != HiddenMode.SHOW_ALL && !cfg.presenting
+        MeasuredStrip(bias = when (cfg.positionNow) { Position.RIGHT -> 1f; Position.CENTER -> 0f; Position.LEFT -> -1f },
             onWidth = { w -> if (w != strip.params.width || (w <= 0) != stripEmpty) main.post { applyWidth(w) } }) {
             Strip(
                 visible = entries(visible),
@@ -613,11 +655,12 @@ class BarController(private val service: AccessibilityService) {
                 chevronAlways = cfg.presenting || hidden.isNotEmpty(),
                 chevronReservePx = (30 * density).toInt(),
                 expanded = open,
-                chevronOnLeft = cfg.position != Position.LEFT,
+                chevronOnLeft = cfg.positionNow != Position.LEFT,
                 look = look.value,
                 maxWidthPx = maxWidth.intValue,
                 heightDp = heightDp.value,
                 events = events,
+                onNeeded = { n -> if (n != neededPx) main.post { neededPx = n; if (inDesktop) check(false) } },
                 onOverflow = { ids -> main.post { if (BarOverflow.ids.value != ids) { BarOverflow.ids.value = ids; main.post(scanNow) } } },
                 // The item a popup belongs to: "item:<id>" and "ctx:<id>" (its right-click menu) are the item's, "bentobar" is ‹'s.
                 open = menuKey?.let { if (it == "bentobar") "chevron" else it.substringAfter(':', "").ifEmpty { null } },
@@ -698,7 +741,7 @@ class BarController(private val service: AccessibilityService) {
         override fun chevron(at: Rect) {
             // While presenting, or with nothing behind it (show everything, or ‹ only for items that
             // don't fit), ‹ opens the menu.
-            Store.config.value.let { if (it.presenting || it.hiddenMode == HiddenMode.SHOW_ALL || (!expanded.value && hiddenItems().isEmpty())) return chevronContext(at) }
+            Store.config.value.let { if (it.presenting || it.hiddenModeNow == HiddenMode.SHOW_ALL || (!expanded.value && hiddenItems().isEmpty())) return chevronContext(at) }
             val next = !expanded.value
             expanded.value = next
             pinned = next
@@ -751,7 +794,7 @@ class BarController(private val service: AccessibilityService) {
 
         override fun wheel(up: Boolean) {
             val cfg = Store.config.value
-            if (cfg.presenting || cfg.hiddenMode == HiddenMode.SHOW_ALL || hiddenItems().isEmpty()) return
+            if (cfg.presenting || cfg.hiddenModeNow == HiddenMode.SHOW_ALL || hiddenItems().isEmpty()) return
             if (up != expanded.value) { expanded.value = up; pinned = false }
         }
 
@@ -773,7 +816,7 @@ class BarController(private val service: AccessibilityService) {
             hovering = inside
             main.removeCallbacks(expandOnHover); main.removeCallbacks(collapse)
             if (inside) {
-                if (Store.config.value.hiddenMode == HiddenMode.HOVER && !expanded.value && hiddenItems().isNotEmpty()) main.postDelayed(expandOnHover, 350)
+                if (Store.config.value.hiddenModeNow == HiddenMode.HOVER && !expanded.value && hiddenItems().isNotEmpty()) main.postDelayed(expandOnHover, 350)
             } else if (!pinned) main.postDelayed(collapse, 900)
             else {
                 val secs = Store.config.value.autoCollapseSec
@@ -803,7 +846,7 @@ class BarController(private val service: AccessibilityService) {
         // Under the strip's end next to the system icons (its start when the strip is on the left).
         val w = strip.params.width
         val h = strip.params.height
-        val at = if (Store.config.value.position == Position.LEFT) Rect(0, 0, 1, h) else Rect(w - 1, 0, w, h)
+        val at = if (Store.config.value.positionNow == Position.LEFT) Rect(0, 0, 1, h) else Rect(w - 1, 0, w, h)
         barMenu(at, everything = true)
         return true
     }
@@ -844,8 +887,8 @@ class BarController(private val service: AccessibilityService) {
         // Under an item in the right half the card's right edge lines up with the item's, in the left half its left edge.
         val left = if (a.centerX() > bounds.width() / 2) a.right - w else a.left
         val x = left.coerceIn(side, (bounds.width() - w - side).coerceAtLeast(side))
-        val y = s.bar.bottom + (MenuRoom.top.value * density).toInt()
-        val maxH = ((bounds.height() - s.bar.bottom) / density - 170).toInt().coerceAtLeast(200)
+        val y = s.bar.bottom + offsetY(s) + (MenuRoom.top.value * density).toInt()
+        val maxH = ((bounds.height() - s.bar.bottom - offsetY(s)) / density - 170).toInt().coerceAtLeast(200)
         val o = MenuWindow(service, "BentoBar menu", onOutside = { outside(it) }, onEscape = { closeMenu() })
         if (!o.show(x, y, w, shadow = { MenuShadow(widthDp.dp, o.glass) }) { MenuSurface(widthDp.dp, maxH.dp, o.glass) { content(host) } }) return
         menu = o
@@ -909,7 +952,7 @@ class BarController(private val service: AccessibilityService) {
         o.params.width = w // exact, as for menus
         o.params.height = (28 * density).toInt()
         o.params.x = (a.centerX() - w / 2).coerceIn(0, (bounds.width() - w).coerceAtLeast(0))
-        o.params.y = s.bar.bottom + (4 * density).toInt()
+        o.params.y = s.bar.bottom + offsetY(s) + (4 * density).toInt()
         tip = o
         o.show { Tooltip(label) }
     }
@@ -1016,7 +1059,7 @@ class BarController(private val service: AccessibilityService) {
         /** How tall the floating strip is when Android gives no status bar height (a window caption is about this tall). */
         private const val FLOAT_HEIGHT_DP = 40
         /** The gap kept from the screen's sides while floating. */
-        private const val FLOAT_EDGE_DP = 16
+        private const val FLOAT_EDGE_DP = 0
         /** [BarSnapshot.summary] of a floating strip: over a window's caption, or over the bare desktop. */
         private const val FLOAT_CAPTION = "floating:caption"
         private const val FLOAT_DESKTOP = "floating:desktop"

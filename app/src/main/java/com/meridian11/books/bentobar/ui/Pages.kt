@@ -55,6 +55,8 @@ import com.meridian11.books.bentobar.BuildConfig
 import com.meridian11.books.bentobar.R
 import com.meridian11.books.bentobar.data.ChipMode
 import com.meridian11.books.bentobar.data.ColorMode
+import com.meridian11.books.bentobar.data.DesktopAlign
+import com.meridian11.books.bentobar.data.MAX_OFFSET_Y_DP
 import com.meridian11.books.bentobar.data.Pill
 import com.meridian11.books.bentobar.data.Position
 import com.meridian11.books.bentobar.data.Section
@@ -167,12 +169,22 @@ fun LookPage() {
             Position.CENTER to stringResource(R.string.look_position_center), Position.LEFT to stringResource(R.string.look_position_left)),
             cfg.position) { p -> Store.update { it.copy(position = p) } }
         SliderRow(stringResource(R.string.look_spacing), cfg.spacing, 0..24, { "$it dp" }) { v -> Store.update { it.copy(spacing = v) } }
+        SliderRow(stringResource(R.string.floating_offset), cfg.offsetYDp, 0..MAX_OFFSET_Y_DP, { "$it dp" }) { v -> Store.update { it.copy(offsetYDp = v) } }
         SwitchRow(stringResource(R.string.floating_switch), cfg.floatWithoutBar, help = stringResource(R.string.floating_switch_help)) { on ->
             Store.update { it.copy(floatWithoutBar = on) }
         }
         if (cfg.floatWithoutBar) {
+            ChoiceRow(stringResource(R.string.floating_align), listOf(DesktopAlign.SAME to stringResource(R.string.floating_align_same),
+                DesktopAlign.RIGHT to stringResource(R.string.floating_align_right), DesktopAlign.CENTER to stringResource(R.string.floating_align_center),
+                DesktopAlign.LEFT to stringResource(R.string.floating_align_left)), cfg.desktopAlign) { v -> Store.update { it.copy(desktopAlign = v) } }
+            SwitchRow(stringResource(R.string.floating_unhide), cfg.desktopShowAll, help = stringResource(R.string.floating_unhide_help),
+                enabled = cfg.hiddenMode != HiddenMode.SHOW_ALL) { on -> Store.update { it.copy(desktopShowAll = on) } }
+            SliderRow(stringResource(R.string.floating_offset_desktop), cfg.desktopOffsetYDp, 0..MAX_OFFSET_Y_DP, { "$it dp" }) { v -> Store.update { it.copy(desktopOffsetYDp = v) } }
+            SwitchRow(stringResource(R.string.floating_overlap), cfg.desktopOverlap, help = stringResource(R.string.floating_overlap_help)) { on ->
+                Store.update { it.copy(desktopOverlap = on) }
+            }
             // Where a window's title bar ends and its buttons begin: the system draws them, so the strip is told how much to leave.
-            SliderRow(stringResource(R.string.floating_title), cfg.floatTitleDp, 0..400, { "$it dp" }) { v -> Store.update { it.copy(floatTitleDp = v) } }
+            if (!cfg.desktopOverlap) SliderRow(stringResource(R.string.floating_title), cfg.floatTitleDp, 0..400, { "$it dp" }) { v -> Store.update { it.copy(floatTitleDp = v) } }
             SliderRow(stringResource(R.string.floating_controls), cfg.floatControlsDp, 80..400, { "$it dp" }) { v -> Store.update { it.copy(floatControlsDp = v) } }
         }
         SwitchRow(stringResource(R.string.look_presenting), cfg.presenting, help = stringResource(R.string.look_presenting_help)) { on ->

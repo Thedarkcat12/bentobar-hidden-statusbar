@@ -1,17 +1,23 @@
 package com.meridian11.books.bentobar.bar
 
+import com.meridian11.books.bentobar.data.Position
+
 /**
- * Where the strip goes on a device with no status bar window (a tablet's PC mode: the clock and icons
- * live in a taskbar at the bottom, and every window has a caption of its own at its top edge). The
- * strip then floats along the top of the screen, in the stretch that no window's caption uses.
+ * Where the strip goes on a device with no status bar window (Desktop Mode: the clock and icons live in a
+ * taskbar at the bottom, and every window has a caption of its own at its top edge). The strip then floats
+ * along the top of the screen, and keeps clear of what a caption shows.
  *
- * A caption is not something accessibility can read: the system draws it, with the app's icon and
- * name at the window's left and its buttons at the right. So the caption is taken as two reserved
- * stretches at the window's two ends ([title] and [controls] pixels), and what lies between them,
- * and any part of the band no window reaches, is free. No Android types, so the cases are unit-tested.
+ * A caption is not something accessibility can read: the system draws it, with the app's icon and name at
+ * the window's left and its buttons at the right. So a caption is taken as two reserved stretches at the
+ * window's two ends ([title] and [controls] pixels), and what lies between them, and any part of the band no
+ * window reaches, is free. No Android types, so the cases are unit-tested.
+ *
+ * The strip stays where its alignment puts it, at the screen's right, centre or left, and moves only when a
+ * reserved stretch would be under it: then to the nearest free stretch it fits in, or, where none is wide
+ * enough, the widest one (it then drops what doesn't fit, into the ‹ menu).
  */
 object FloatingBand {
-    /** The stretch of the band the strip may use, in screen pixels. */
+    /** A stretch of the band, in screen pixels. */
     data class Free(val left: Int, val right: Int) {
         val width: Int get() = right - left
     }
@@ -33,32 +39,65 @@ object FloatingBand {
         windows.any { it.left <= slack && it.top <= slack && it.right >= screenW - slack && it.bottom >= screenH - slack }
 
     /**
-     * The widest stretch of the top band, [bandH] pixels high, that no caption's [title] or [controls]
-     * reserve takes, keeping [edge] pixels from each side of the screen. Where two stretches are
-     * equally wide the right one wins: that is where the status bar's own items were.
+     * The stretches of the band, from [bandTop] to [bandBottom], that no caption's [title] or [controls]
+     * reserve takes, keeping [edge] pixels from each side of the screen, left to right.
      *
      * Only windows that reach into the band count, and only those wide enough to have a caption with
      * both ends (a menu or a tooltip near the top edge has none).
      */
-    fun free(windows: List<AppWindow>, screenW: Int, bandH: Int, edge: Int, title: Int, controls: Int): Free {
+    fun gaps(windows: List<AppWindow>, screenW: Int, bandTop: Int, bandBottom: Int, edge: Int, title: Int, controls: Int): List<Free> {
         val minWidth = title + controls
         val taken = ArrayList<Pair<Int, Int>>()
         for (w in windows) {
-            if (w.top >= bandH || w.bottom <= 0 || w.right - w.left < minWidth) continue
+            if (w.top >= bandBottom || w.bottom <= bandTop || w.right - w.left < minWidth) continue
             val left = w.left.coerceIn(0, screenW)
             val right = w.right.coerceIn(0, screenW)
             taken += left to minOf(right, left + title)
             taken += maxOf(left, right - controls) to right
         }
-        var best = Free(edge, edge)
+        val out = ArrayList<Free>()
         var cursor = edge
         val end = screenW - edge
         for ((l, r) in taken.sortedBy { it.first }) {
             val gapEnd = minOf(l, end)
-            if (gapEnd > cursor && gapEnd - cursor >= best.width) best = Free(cursor, gapEnd)
+            if (gapEnd > cursor) out += Free(cursor, gapEnd)
             cursor = maxOf(cursor, r)
         }
-        if (end > cursor && end - cursor >= best.width) best = Free(cursor, end)
-        return best
+        if (end > cursor) out += Free(cursor, end)
+        return out
     }
+
+    /**
+     * The stretch the strip may use, when it wants [need] pixels (0 when not known yet) and is aligned by
+     * [align]: the stretch that holds the strip where its alignment puts it, if there is one; else the
+     * nearest stretch wide enough for it; else the widest. Nothing at all gives an empty stretch.
+     */
+    fun place(
+        windows: List<AppWindow>, screenW: Int, bandTop: Int, bandBottom: Int, edge: Int, title: Int, controls: Int,
+        need: Int, align: Position,
+    ): Free {
+        val gaps = gaps(windows, screenW, bandTop, bandBottom, edge, title, controls)
+        if (gaps.isEmpty()) return Free(edge, edge)
+        val whole = Free(edge, screenW - edge)
+        val wanted = sits(whole, need, align, screenW)
+        gaps.firstOrNull { it.left <= wanted.left && it.right >= wanted.right }?.let { return it }
+        fun distance(g: Free) = Math.abs(centre(sits(g, need, align, screenW)) - centre(wanted))
+        val fitting = gaps.filter { it.width >= need }
+        if (fitting.isNotEmpty()) return fitting.minBy { distance(it) }
+        val widest = gaps.maxOf { it.width }
+        return gaps.filter { it.width == widest }.minBy { distance(it) }
+    }
+
+    /** Where a strip [need] wide sits in [g] under [align]: against its right or left end, or as near the screen's middle as it can. */
+    private fun sits(g: Free, need: Int, align: Position, screenW: Int): Free = when (align) {
+        Position.RIGHT -> Free(maxOf(g.left, g.right - need), g.right)
+        Position.LEFT -> Free(g.left, minOf(g.right, g.left + need))
+        Position.CENTER -> {
+            val w = minOf(need, g.width)
+            val left = (screenW / 2 - w / 2).coerceIn(g.left, maxOf(g.left, g.right - w))
+            Free(left, left + w)
+        }
+    }
+
+    private fun centre(f: Free) = (f.left + f.right) / 2
 }

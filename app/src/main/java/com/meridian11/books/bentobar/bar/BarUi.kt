@@ -232,6 +232,8 @@ fun Strip(
     events: StripEvents,
     /** Ids of the items that didn't fit, each time that changes. */
     onOverflow: (Set<String>) -> Unit = {},
+    /** The width every item would take side by side, in px, each time that changes: what the strip wants, whatever room it has. */
+    onNeeded: (Int) -> Unit = {},
     /** The item whose popup is open ("chevron" for the ‹ menu), or null: the highlight stays on it. */
     open: String? = null,
 ) {
@@ -319,7 +321,7 @@ fun Strip(
         val items = if (chevronOnLeft) revealed + visible else visible + revealed
         if (chevronOnLeft) chevron()
         FitRow(ids = items.map { it.item.id }, maxWidthPx = maxWidthPx, chevronAlways = chevronAlways, chevronPx = chevronReservePx,
-            keepEnd = chevronOnLeft, spacing = look.spacing, onDropped = { ids -> glow.dropped(ids); onOverflow(ids) }) {
+            keepEnd = chevronOnLeft, spacing = look.spacing, onDropped = { ids -> glow.dropped(ids); onOverflow(ids) }, onNeeded = onNeeded) {
             // key(): remembered state (hover, held width) belongs to the item, not to its position,
             // or an item popping in would inherit its neighbour's width.
             items.forEach { androidx.compose.runtime.key(it.item.id) { ItemView(it, look, events, glow) } }
@@ -448,12 +450,16 @@ internal fun fitStrip(widths: List<Int>, gap: Int, budget: Int, chevronAlways: B
  */
 @Composable
 private fun FitRow(ids: List<String>, maxWidthPx: Int, chevronAlways: Boolean, chevronPx: Int, keepEnd: Boolean, spacing: Dp,
-                   onDropped: (Set<String>) -> Unit, content: @Composable () -> Unit) {
+                   onDropped: (Set<String>) -> Unit, onNeeded: (Int) -> Unit = {}, content: @Composable () -> Unit) {
     val last = remember { arrayOf<Set<String>?>(null) }
+    val lastNeeded = remember { intArrayOf(-1) }
     Layout(content) { measurables, constraints ->
         val gap = spacing.roundToPx()
         val placeables = measurables.map { it.measure(Constraints(maxHeight = constraints.maxHeight)) }
         val widths = placeables.map { it.width }
+        // Every item measured at its own width, so this is what the row wants whatever it is given.
+        val needed = widths.sum() + gap * (widths.size - 1).coerceAtLeast(0)
+        if (needed != lastNeeded[0]) { lastNeeded[0] = needed; onNeeded(needed) }
         val budget = minOf(maxWidthPx, constraints.maxWidth).coerceAtLeast(0)
         val (keep, used) = fitStrip(widths, gap, budget, chevronAlways, chevronPx, keepEnd)
         val dropped = ids.filterIndexed { i, _ -> i < keep.size && !keep[i] }.toSet()
