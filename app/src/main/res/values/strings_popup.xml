@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- How see-through BentoBar's popups are. Every name here starts with popup_. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
+    <string name="popup_opacity">Popup opacity</string>
+</resources>

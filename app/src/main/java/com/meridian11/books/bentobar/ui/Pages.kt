@@ -57,6 +57,7 @@ import com.meridian11.books.bentobar.data.ChipMode
 import com.meridian11.books.bentobar.data.ColorMode
 import com.meridian11.books.bentobar.data.DesktopAlign
 import com.meridian11.books.bentobar.data.MAX_OFFSET_Y_DP
+import com.meridian11.books.bentobar.data.MIN_POPUP_OPACITY
 import com.meridian11.books.bentobar.data.Pill
 import com.meridian11.books.bentobar.data.Position
 import com.meridian11.books.bentobar.data.Section
@@ -207,6 +208,9 @@ fun LookPage() {
         }
         SwitchRow(stringResource(R.string.look_no_animations), cfg.noAnimations, help = stringResource(R.string.look_no_animations_help)) { on ->
             Store.update { it.copy(noAnimations = on) }
+        }
+        SliderRow(stringResource(R.string.popup_opacity), cfg.popupOpacity.coerceIn(MIN_POPUP_OPACITY, 100), MIN_POPUP_OPACITY..100, { "$it%" }) { v ->
+            Store.update { it.copy(popupOpacity = v) }
         }
         SwitchRow(stringResource(R.string.look_system_tint), cfg.systemTint, help = stringResource(R.string.look_system_tint_help)) { on ->
             Store.update { it.copy(systemTint = on) }

@@ -34,6 +34,7 @@ import com.meridian11.books.bentobar.R
 import com.meridian11.books.bentobar.data.Display
 import com.meridian11.books.bentobar.data.ItemConfig
 import com.meridian11.books.bentobar.data.Section
+import com.meridian11.books.bentobar.data.MIN_POPUP_OPACITY
 import com.meridian11.books.bentobar.data.Store
 import com.meridian11.books.bentobar.data.notDrawn
 import com.meridian11.books.bentobar.items.Items
@@ -69,15 +70,17 @@ fun MenuSurface(width: Dp, maxHeight: Dp, glass: MenuGlassState?, content: @Comp
         val scheme = MaterialTheme.colorScheme
         // "Tint with system colors" (visual.md §6): the veil, or the solid card, takes half of the palette's secondary
         // container (onSecondary in dark theme): a tint, not a wash, and 0.04 more of it so text stays as readable.
-        val tint = Store.config.collectAsState().value.systemTint
+        val conf = Store.config.collectAsState().value
+        val tint = conf.systemTint
+        val opacity = conf.popupOpacity.coerceIn(MIN_POPUP_OPACITY, 100) / 100f
         val hue = if (dark) scheme.onSecondary else scheme.secondaryContainer
         val look = GlassLook(
-            veil = when {
+            veil = (when {
                 g.blur && tint -> lerp(scheme.surfaceContainerLowest, hue, 0.5f).copy(alpha = if (dark) 0.66f else 0.60f)
                 g.blur -> scheme.surfaceContainerLowest.copy(alpha = if (dark) 0.62f else 0.56f)
                 tint -> lerp(scheme.surfaceContainerHigh, hue, 0.5f)
                 else -> scheme.surfaceContainerHigh
-            },
+            }).let { it.copy(alpha = it.alpha * opacity) },
             rim = Color.White.copy(alpha = if (dark) 0.44f else 0.80f),
             hairline = Color.Black.copy(alpha = if (dark) 0.28f else 0.20f),
             dark = dark,

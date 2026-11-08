@@ -107,6 +107,8 @@ data class BarConfig(
     val noAnimations: Boolean = false,
     /** "Tint with system colors": the popups' glass takes a tint of the system's (wallpaper's) palette. Off: neutral glass. */
     val systemTint: Boolean = false,
+    /** How much of the popups' own veil (or solid card) is drawn, in percent: 100 is the standard look, less lets more of the screen show through. */
+    val popupOpacity: Int = 100,
     /**
      * Desktop Mode: with no status bar at all (a tablet's desktop windowing keeps its clock and icons in a taskbar),
      * float along the top of the screen instead of going away. Full-screen apps still hide it. Off by default: where
@@ -189,6 +191,9 @@ val BarConfig.positionNow: Position get() = if (DesktopMode.active.value) deskto
 
 /** How far below the top of the screen the strip sits right now, in dp. */
 val BarConfig.offsetYNowDp: Int get() = (if (DesktopMode.active.value) desktopOffsetYDp else offsetYDp).coerceIn(0, MAX_OFFSET_Y_DP)
+
+/** The least of the popups' veil that can be drawn, in percent: below this, text on them stops being readable. */
+const val MIN_POPUP_OPACITY = 30
 
 /** The most the strip can be moved down, in dp. */
 const val MAX_OFFSET_Y_DP = 64
