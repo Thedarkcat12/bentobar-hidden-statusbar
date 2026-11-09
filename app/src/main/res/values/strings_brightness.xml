@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Brightness: the screen's brightness, with a slider in the bar. Every name here starts with brightness_ or item_brightness_. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
+    <string name="item_brightness_title">Brightness</string>
+    <string name="item_brightness_desc">Screen brightness; a slider to change it from the bar</string>
+    <string name="brightness_desc">Brightness %1$d%%</string>
+    <string name="brightness_tooltip">Brightness %1$d%%</string>
+    <string name="brightness_pct">%1$d%%</string>
+    <string name="brightness_label">Brightness</string>
+    <string name="brightness_slider">Slider in the bar</string>
+    <string name="brightness_slider_help">Click or drag it to set the brightness. Scrolling over it changes it too, if the wheel is switched on in Look.</string>
+    <string name="brightness_slider_needs_access">Changing the brightness needs Android\'s permission to modify system settings for BentoBar; until then the bar shows the number. Open the item in the bar and choose Allow.</string>
+    <string name="brightness_allow">Allow changing brightness</string>
+    <string name="brightness_display_settings">Display settings</string>
+</resources>

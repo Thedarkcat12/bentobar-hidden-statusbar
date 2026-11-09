@@ -14,6 +14,8 @@
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <!-- Weather's My location, asked for only when an item chooses it: approximate only, never precise, and no background-location permission: Android gives the bar's accessibility service the location under the "while using the app" grant (how Play reads that is decided with the 1.4 submission). -->
+    <!-- The Brightness item: Android asks the user for this one on its own settings page, and the item only shows the number until then. -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- To explain why the bar can't run when Advanced Protection is on (normal permission). -->
@@ -29,11 +31,6 @@
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
-        </intent>
-        <!-- The home app, whose name is the title of the desktop's window (Desktop Mode tells it from a maximized app by that). -->
-        <intent>
-            <action android:name="android.intent.action.MAIN" />
-            <category android:name="android.intent.category.HOME" />
         </intent>
         <!-- The Googlebook's Feedback app, for the Shortcut item's Report a bug: offered only where it is. -->
         <package android:name="com.google.android.desktop.feedback" />

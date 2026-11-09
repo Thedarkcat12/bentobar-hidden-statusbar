@@ -77,12 +77,11 @@ object Store {
     }
 
     fun updateItem(id: String, change: (ItemConfig) -> ItemConfig) =
-        update { c -> c.copy(items = c.items.map { if (it.id == id) change(it) else it }) }
+        update { c -> c.copy(items = c.items.map { if (it.id != id) it else if (DesktopMode.editing.value && c.desktopSeparate) it.changedInDesktop(change) else change(it) }) }
 
     /**
-     * A new item goes at the left of the bar, where a new item is easy to spot, but after the Next
-     * meeting item, which stays at the far left: its width changes most, and at the bar's outer
-     * edge that moves nothing else. Hidden and Off items go at the end of their section. [whenActive]:
+     * A new item goes at the left of the bar, where a new item is easy to spot. Hidden and Off items
+     * go at the end of their section. [whenActive]:
      * with its "Show when" rule on (for the types that are added to When active).
      */
     fun add(type: String, section: Section = Section.SHOWN, options: Map<String, String> = emptyMap(), whenActive: Boolean = false): String {
@@ -90,7 +89,7 @@ object Store {
         update { c ->
             val item = ItemConfig(id, type, section, whenActive = whenActive, options = options)
             val at = if (section != Section.SHOWN) -1
-                else c.items.indexOfFirst { it.section == Section.SHOWN && it.type != PINNED_LEFT }
+                else c.items.indexOfFirst { it.section == Section.SHOWN }
             c.copy(items = if (at < 0) c.items + item else c.items.toMutableList().apply { add(at, item) })
         }
         return id
@@ -108,9 +107,6 @@ object Store {
         val at = items.indexOfFirst { it.id == of.id }
         return if (at < 0) items else items.toMutableList().apply { add(at + 1, items[at].copy(id = id)) }
     }
-
-    /** The item type kept at the bar's far left (see [add]). */
-    const val PINNED_LEFT = "event"
 
     fun remove(id: String) = update { c -> c.copy(items = c.items.filterNot { it.id == id }) }
 

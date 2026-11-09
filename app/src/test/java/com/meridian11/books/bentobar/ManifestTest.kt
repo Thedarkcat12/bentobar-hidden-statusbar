@@ -26,8 +26,8 @@ class ManifestTest {
         // Googlebook's Feedback app (the Shortcut item's Report a bug). Nothing else is looked for.
         val queries = manifest.all("queries").single()
         assertEquals(listOf(com.meridian11.books.bentobar.items.ShortcutRules.FEEDBACK_PACKAGE), queries.all("package").map { it.attr("name") })
-        assertEquals(listOf("android.intent.action.MAIN", "android.intent.action.MAIN"), queries.all("intent").flatMap { it.all("action") }.map { it.attr("name") })
-        assertEquals(listOf("android.intent.category.LAUNCHER", "android.intent.category.HOME"), queries.all("intent").flatMap { it.all("category") }.map { it.attr("name") })
+        assertEquals(listOf("android.intent.action.MAIN"), queries.all("intent").flatMap { it.all("action") }.map { it.attr("name") })
+        assertEquals(listOf("android.intent.category.LAUNCHER"), queries.all("intent").flatMap { it.all("category") }.map { it.attr("name") })
     }
 
     @Test fun thePermissionsAreTheseAndNoOthers() {
@@ -41,6 +41,7 @@ class ManifestTest {
             "android.permission.POST_PROMOTED_NOTIFICATIONS",
             "android.permission.READ_CALENDAR",
             "android.permission.ACCESS_COARSE_LOCATION",
+            "android.permission.WRITE_SETTINGS",
             "android.permission.SCHEDULE_EXACT_ALARM",
             "android.permission.QUERY_ADVANCED_PROTECTION_MODE",
             "android.permission.PACKAGE_USAGE_STATS",

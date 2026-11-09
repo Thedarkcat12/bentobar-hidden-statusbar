@@ -88,7 +88,7 @@ object SliderMath {
  * is one step): only a pointer that has really moved to another level can, so a click that
  * trembles at the track's start is still a click.
  */
-class SliderGesture(private val steps: Int) {
+class SliderGesture(private val steps: Int, private val dragOnly: Boolean = false) {
     /** How a press ended. */
     sealed interface End {
         /** The slider stays at [level]: report it once more, as the last word. */
@@ -114,9 +114,11 @@ class SliderGesture(private val steps: Int) {
      * Returns the level to report, or null (a finger: nothing yet).
      */
     fun press(level: Float, follows: Boolean): Float? {
-        down = true; moved = false; following = follows; said = Float.NaN
-        under = if (follows) SliderMath.snap(level, steps) else Float.NaN
-        return if (follows) say(SliderMath.atLeastOneStep(level, steps)) else null
+        // Drag only: not even a mouse sets a level on the press; it waits to be moved past the slop, like a finger.
+        val follow = follows && !dragOnly
+        down = true; moved = false; following = follow; said = Float.NaN
+        under = if (follow) SliderMath.snap(level, steps) else Float.NaN
+        return if (follow) say(SliderMath.atLeastOneStep(level, steps)) else null
     }
 
     /**
@@ -147,6 +149,8 @@ class SliderGesture(private val steps: Int) {
             followed -> if (moved || said.isNaN()) End.Level(SliderMath.snap(level, steps)) else End.Level(said)
             !inside -> End.None
             longHold -> End.Menu
+            // A click that never became a drag sets nothing when only a drag moves the slider.
+            dragOnly -> End.None
             else -> End.Level(SliderMath.atLeastOneStep(level, steps))
         }
     }

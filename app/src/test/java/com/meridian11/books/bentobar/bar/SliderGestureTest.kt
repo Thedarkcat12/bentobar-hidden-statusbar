@@ -181,4 +181,25 @@ class SliderGestureTest {
         assertEquals(0.5f, g.move(0.5f, pastSlop = true)!!, 0f)
         assertEquals(SliderGesture.End.Level(0f), g.release(0f, inside = true, longHold = false))
     }
+
+    @Test fun withDragOnlyAClickSetsNothingNotEvenForAMouse() {
+        val g = SliderGesture(15, dragOnly = true)
+        assertNull(g.press(0.6f, follows = true))
+        assertTrue(g.down && !g.following)
+        assertEquals(SliderGesture.End.None, g.release(0.6f, inside = true, longHold = false))
+    }
+
+    @Test fun withDragOnlyAMouseThatMovesPastTheSlopDragsAsUsual() {
+        val g = SliderGesture(15, dragOnly = true)
+        assertNull(g.press(0.2f, follows = true))
+        assertNull(g.move(0.3f, pastSlop = false))
+        assertEquals(step(9), g.move(0.6f, pastSlop = true)!!, 1e-6f)
+        assertEquals(level(9), g.release(0.6f, inside = true, longHold = false))
+    }
+
+    @Test fun withDragOnlyALongHoldStillOpensTheMenu() {
+        val g = SliderGesture(15, dragOnly = true)
+        g.press(0.2f, follows = true)
+        assertEquals(SliderGesture.End.Menu, g.release(0.2f, inside = true, longHold = true))
+    }
 }

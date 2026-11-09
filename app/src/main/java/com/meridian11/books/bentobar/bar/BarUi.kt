@@ -823,13 +823,15 @@ private fun RouteTrack(route: BarRoute, look: StripLook, alert: Boolean, rtl: Bo
  */
 private fun Modifier.slides(steps: Int, rtl: Boolean, onHeld: (Float?) -> Unit, onContext: () -> Unit,
                             onLevel: (level: Float, done: Boolean) -> Unit): Modifier = composed {
+    // "Only a drag moves a slider": a click sets nothing.
+    val dragOnly = com.meridian11.books.bentobar.data.Store.config.collectAsState().value.dragOnlySliders
     val level by rememberUpdatedState(onLevel)
     val holds by rememberUpdatedState(onHeld)
     val menu by rememberUpdatedState(onContext)
-    pointerInput(steps, rtl) {
+    pointerInput(steps, rtl, dragOnly) {
         val track = SLIDER_TRACK.toPx()
         // The rules are SliderGesture's (unit-tested); this turns pointer events into its four calls.
-        val gesture = SliderGesture(steps)
+        val gesture = SliderGesture(steps, dragOnly)
         fun say(l: Float) { holds(l); level(l, false) }
         fun end(how: SliderGesture.End) {
             holds(null)

@@ -79,4 +79,35 @@ class DesktopModeTest {
         assertTrue(c.copy(chevronCenter = ChevronSide.RIGHT).chevronOnLeft(Position.RIGHT))
         assertFalse(c.copy(chevronCenter = ChevronSide.RIGHT).chevronOnLeft(Position.LEFT))
     }
+
+    @Test fun anItemsDesktopSettingsStartAsTheRegularOnesAndThenStandApart() {
+        val c = ItemConfig("m", "media", Section.SHOWN, options = mapOf("art" to "true"))
+        // A change made for Desktop Mode leaves the regular settings alone.
+        val d = c.changedInDesktop { it.with("progress", "true") }
+        assertEquals(mapOf("art" to "true"), d.options)
+        assertEquals(mapOf("art" to "true", "progress" to "true"), d.deskOptions)
+        // A change made for the regular layout afterwards does not reach Desktop Mode.
+        val r = d.with("art", "false")
+        assertEquals(mapOf("art" to "true", "progress" to "true"), r.deskView().options)
+        // Without a setting of its own, Desktop Mode follows the regular ones.
+        assertEquals(c.options, c.deskView().options)
+        // A change that touches no display or option makes none of its own.
+        val moved = c.changedInDesktop { it.copy(whenActive = true) }
+        assertEquals(null, moved.deskOptions)
+        assertTrue(moved.whenActive)
+    }
+
+    @Test fun anItemIsAsItIsInDesktopModeOnlyWhileThatLayoutIsActive() {
+        val c = ItemConfig("m", "media", Section.SHOWN, options = mapOf("a" to "1"), deskOptions = mapOf("a" to "2"), deskDisplay = Display.ICON)
+        DesktopMode.active.value = false
+        assertEquals("1", c.now.opt("a", ""))
+        DesktopMode.active.value = true
+        try {
+            assertEquals("2", c.now.opt("a", ""))
+            assertEquals(Display.ICON, c.now.display)
+            assertEquals(TextSize.LARGE, BarConfig(textSize = TextSize.SMALL, desktopTextSize = TextSize.LARGE).textSizeNow)
+            assertEquals(TextSize.SMALL, BarConfig(textSize = TextSize.SMALL).textSizeNow)
+            assertEquals(Pill.SOLID, BarConfig(pill = Pill.NONE, desktopPill = Pill.SOLID).pillNow)
+        } finally { DesktopMode.active.value = false }
+    }
 }

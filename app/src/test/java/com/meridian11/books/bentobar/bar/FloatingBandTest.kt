@@ -160,13 +160,16 @@ class FloatingBandTest {
         assertTrue(FloatingBand.fills(emptyList(), screenW, screenH).isEmpty())
     }
 
-    @Test fun theTopOfTwoFillingWindowsIsTheAppAndALoneOneIsAnAppOnlyIfItIsNotTheDesktop() {
+    @Test fun anAppEndingAboveTheDisplaysBottomIsMaximizedAndALoneWindowReachingItIsTheDesktop() {
+        val screenH = 1250
         val app = AppWindow(1, 0, 0, screenW, 1160)
-        val desktop = AppWindow(2, 0, 0, screenW, 1250)
-        assertEquals(app, FloatingBand.maximizedApp(listOf(app, desktop)) { false })
-        assertEquals(app, FloatingBand.maximizedApp(listOf(app)) { false })
-        assertNull(FloatingBand.maximizedApp(listOf(desktop)) { it.id == 2 })
-        assertNull(FloatingBand.maximizedApp(emptyList()) { false })
+        val desktop = AppWindow(2, 0, 0, screenW, screenH)
+        assertEquals(app, FloatingBand.maximizedApp(listOf(app), screenH))
+        assertEquals(app, FloatingBand.maximizedApp(listOf(app, desktop), screenH))
+        // The desktop alone is no maximized window; two that reach the bottom make the top one an app.
+        assertNull(FloatingBand.maximizedApp(listOf(desktop), screenH))
+        assertEquals(desktop, FloatingBand.maximizedApp(listOf(desktop, AppWindow(3, 0, 0, screenW, screenH)), screenH))
+        assertNull(FloatingBand.maximizedApp(emptyList(), screenH))
     }
 
     @Test fun noTitleReserveDoesNotSplitTheBand() {
@@ -184,5 +187,20 @@ class FloatingBandTest {
     @Test fun aMaximizedWindowAboveTheTaskbarIsNotFullScreen() {
         assertFalse(FloatingBand.coversDisplay(listOf(AppWindow(1, 0, 0, screenW, screenH - 108)), screenW, screenH))
         assertFalse(FloatingBand.coversDisplay(emptyList(), screenW, screenH))
+    }
+
+    @Test fun snappedWindowsHaveHandlesTheStripKeepsClearOf() {
+        val screenH = 1250 // shadows the class's 1200
+        val left = AppWindow(1, 0, 0, 994, 1230)
+        val right = AppWindow(2, 1006, 0, 2000, 1230)
+        assertEquals(listOf(left, right), FloatingBand.snapped(listOf(left, right), screenW, screenH))
+        // Not a window that fills the width, nor a floating one under its own caption.
+        assertTrue(FloatingBand.snapped(listOf(AppWindow(3, 0, 0, screenW, 1160), AppWindow(4, 300, 80, 1400, 900)), screenW, screenH).isEmpty())
+        val blocked = FloatingBand.handles(listOf(left, right), 100)
+        assertEquals(listOf(397 to 597, 1403 to 1603), blocked)
+        // A centred strip fits between the two handles, and one too wide for that has no gap that holds it, so it goes to the widest.
+        val g = FloatingBand.gaps(emptyList(), screenW, 0, 40, 0, 0, 0, blocked)
+        assertEquals(listOf(FloatingBand.Free(0, 397), FloatingBand.Free(597, 1403), FloatingBand.Free(1603, screenW)), g)
+        assertEquals(FloatingBand.Free(597, 1403), FloatingBand.place(emptyList(), screenW, 0, 40, 0, 0, 0, 700, Position.CENTER, blocked))
     }
 }

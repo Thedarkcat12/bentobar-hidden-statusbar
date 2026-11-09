@@ -452,6 +452,13 @@ object NowPlaying {
         runCatching { p.controller.transportControls.seekTo(positionMs.coerceAtLeast(0)) }
     }
 
+    /** Moves the player [key] by [deltaMs] (back when negative) from where it is, to where it can seek: not before the start, not past the end. */
+    fun seekBy(key: String, deltaMs: Long) {
+        val s = state.value.sessions.firstOrNull { it.key == key } ?: return
+        if (s.durationMs <= 0) return
+        seekTo(key, (s.position(Now.elapsed()) + deltaMs).coerceIn(0, s.durationMs))
+    }
+
     /** Opens the player's own window: what its session offers for that, else its launcher entry. False if neither worked. */
     @Suppress("DEPRECATION") // the mode's newer name exists from Android 16 on; this one works from 14
     fun open(key: String? = null): Boolean {

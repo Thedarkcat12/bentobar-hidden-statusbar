@@ -37,7 +37,10 @@ import com.meridian11.books.bentobar.data.HiddenMode
 import com.meridian11.books.bentobar.data.MAX_EDGE_DP
 import com.meridian11.books.bentobar.data.MAX_OFFSET_Y_DP
 import com.meridian11.books.bentobar.data.offsetYNowDp
+import com.meridian11.books.bentobar.data.now
+import com.meridian11.books.bentobar.data.pillNow
 import com.meridian11.books.bentobar.data.positionNow
+import com.meridian11.books.bentobar.data.textSizeNow
 import com.meridian11.books.bentobar.data.shows
 import com.meridian11.books.bentobar.data.behindChevron
 import com.meridian11.books.bentobar.data.chevronOnLeft
@@ -417,11 +420,13 @@ class BarController(private val service: AccessibilityService) {
         val system = boxes(AccessibilityWindowInfo.TYPE_SYSTEM)
         // A maximized window draws no caption of its own that the strip could sit in, so an app's own top bar lies under it. With
         // this on, the strip then goes into presenting mode (a running timer or a meeting about to start, and ‹), as there is no
-        // title bar of the system's to sit in. The desktop's own window fills the screen too: it is the one below another that
-        // fills it, or a lone one that is the home app's (by its title, or none).
+        // title bar of the system's to sit in. The desktop's own window fills the screen too (see [FloatingBand.maximizedApp]).
         val titles = windows.filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }.associate { it.id to it.title?.toString().orEmpty() }
         val fills = FloatingBand.fills(apps, screenW, screenH)
-        val maximized = FloatingBand.maximizedApp(fills) { isDesktopWindow(titles[it.id].orEmpty()) }
+        // The desktop's window reaches the display's bottom, under the taskbar; an app maximized by the system stops above it. A lone
+        // window that fills the whole display is the desktop's (or an app that is full screen, which has no strip to show either),
+        // so only a window above the display's bottom counts, or one of two that fill it, the top one.
+        val maximized = FloatingBand.maximizedApp(fills, screenH)
         val maxed = cfg.desktopHideMaximized && maximized != null
         val h = if (inset > 0) inset else (FLOAT_HEIGHT_DP * density).toInt()
         // Desktop Mode's own alignment and offset: this runs before DesktopMode.active is set for this look.
@@ -431,30 +436,22 @@ class BarController(private val service: AccessibilityService) {
         // Staying where the alignment puts it is what the strip does first; only the buttons are kept clear of. With
         // "Overlay window titles" off it keeps clear of a window's icon and name as well.
         val title = if (cfg.desktopOverlap) 0 else (cfg.floatTitleDp * density).toInt()
-        val chrome = if (cfg.pill == Pill.NONE) 2 * (6 * density).toInt() else 2 * (6 * density).toInt() + 2 * (STRIP_PILL_PADDING.value * density).toInt()
+        val pill = if (cfg.desktopSeparate) cfg.desktopPill ?: cfg.pill else cfg.pill
+        val chrome = if (pill == Pill.NONE) 2 * (6 * density).toInt() else 2 * (6 * density).toInt() + 2 * (STRIP_PILL_PADDING.value * density).toInt()
         // The empty desktop's own window spans the whole display and has no caption: counting it reserved a
         // title's and buttons' width at both screen edges with nothing there.
-        val captioned = apps.filterNot { it.left <= 2 && it.top <= 2 && it.right >= screenW - 2 && it.bottom >= screenH - 2 }
+        // Windows snapped side by side (split screen) have no caption either, only a handle at the middle of their top edge.
+        val snapped = FloatingBand.snapped(apps, screenW, screenH)
+        val captioned = apps.filterNot { (it.left <= 2 && it.top <= 2 && it.right >= screenW - 2 && it.bottom >= screenH - 2) || it in snapped }
         val free = FloatingBand.place(captioned, screenW, top, top + h, (cfg.desktopEdgeDp.coerceIn(0, MAX_EDGE_DP) * density).toInt(),
-            title, (cfg.floatControlsDp * density).toInt(), if (neededPx > 0) neededPx + chrome else 0, align)
+            title, (cfg.floatControlsDp * density).toInt(), if (neededPx > 0) neededPx + chrome else 0, align,
+            FloatingBand.handles(snapped, (SNAP_HANDLE_HALF_DP * density).toInt()))
         val caption = captioned.any { it.top < top + h && it.bottom > top }
         floatNote("free=${free.left}..${free.right} top=$top h=$h need=$neededPx maximized=${maximized?.id} windows=" +
             apps.joinToString(";") { "${it.id}:'${titles[it.id].orEmpty()}' ${it.left},${it.top},${it.right},${it.bottom}" } + " caption=$caption")
         return BarSnapshot(FLOATING_ID, Rect(0, top, screenW, top + h), Rect(free.left, top, free.right, top + h), null,
             when { maxed -> FLOAT_MAXIMIZED; caption -> FLOAT_CAPTION; else -> FLOAT_DESKTOP })
     }
-
-    /** The home app's label, which names the desktop's window; read once. */
-    private val homeLabels: List<String> by lazy {
-        runCatching {
-            val pkgs = service.packageManager
-            val info = pkgs.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
-            listOfNotNull(info?.loadLabel(pkgs)?.toString(), info?.activityInfo?.applicationInfo?.loadLabel(pkgs)?.toString()).filter { it.isNotBlank() }
-        }.getOrDefault(emptyList())
-    }
-
-    /** Whether a window with this title is the desktop (the home app's): no title at all, or the home app's name. */
-    private fun isDesktopWindow(title: String): Boolean = title.isBlank() || homeLabels.any { it.equals(title, ignoreCase = true) }
 
     /** The width the strip would like (its items and gaps, in px), as the strip last measured it; 0 before it has. */
     private var neededPx = 0
@@ -465,6 +462,7 @@ class BarController(private val service: AccessibilityService) {
         DesktopMode.active.value = on
         // Items move between the bar and ‹ with the mode: what was opened stays folded.
         if (expanded.value) { expanded.value = false; pinned = false }
+        applyLook()
         if (strip.shown) Ticker.refresh()
     }
 
@@ -491,7 +489,7 @@ class BarController(private val service: AccessibilityService) {
         // Without a pill the strip's ends are only room for the highlight's round ends: the window reaches that much
         // further out, into the gap, so the items stay 6 dp from the free area's edges as they always were.
         val ends = (STRIP_PILL_PADDING.value * density).toInt()
-        val out = if (cfg.pill == Pill.NONE) ends else 0
+        val out = if (cfg.pillNow == Pill.NONE) ends else 0
         // Floating, a stretch that reaches the screen's side is flush with it; elsewhere the items keep their gap.
         // The room kept from the screen's side (Desktop Mode's setting) is where its pill, or without one its items, start.
         val edgePx = (cfg.desktopEdgeDp.coerceIn(0, MAX_EDGE_DP) * density).toInt()
@@ -511,7 +509,7 @@ class BarController(private val service: AccessibilityService) {
         }
         // The whole strip fits the free area: items, the pill's own padding and (decided by the strip,
         // from what fits) room for ‹.
-        val pillPad = if (cfg.pill == Pill.NONE) 0 else 2 * ends
+        val pillPad = if (cfg.pillNow == Pill.NONE) 0 else 2 * ends
         maxWidth.intValue = (s.free.width() - gapL - gapR - pillPad).coerceAtLeast(0)
         heightDp.value = (s.bar.height() / density).dp
         val where = "free=${s.free.toShortString()} x=${p.x} maxW=${maxWidth.intValue} [${s.summary}]"
@@ -646,7 +644,7 @@ class BarController(private val service: AccessibilityService) {
         }
         val live = Contrast.resolve(text, bg)
         BarLook.current.value = live
-        look.value = StripLook(live.fg, live.barDark, cfg.textSize, cfg.spacing.dp, cfg.pill, live.background)
+        look.value = StripLook(live.fg, live.barDark, cfg.textSizeNow, cfg.spacing.dp, cfg.pillNow, live.background)
         Log.i(tag, "look fg=${hex(live.fg)} bg=${bg?.let { hex(it) } ?: "transparent"} dark=${live.barDark} " +
             "contrast=${"%.1f".format(java.util.Locale.ROOT, Contrast.ratio(live.fg, live.background))}")
     }
@@ -667,17 +665,22 @@ class BarController(private val service: AccessibilityService) {
         val desktop by DesktopMode.active.collectAsState()
         val inDesktop = desktop
         val states by Ticker.states.collectAsState()
-        val entries = { list: List<ItemConfig> -> list.map { StripEntry(it, states[it.id] ?: Ticker.placeholder(it)) } }
+        // Divider lines only while the hidden items are out, when the user asks for that.
+        val openNow = expanded.value && cfg.hiddenMode != HiddenMode.SHOW_ALL
+        val dividers = !cfg.dividersOnExpand || openNow
+        // An item as it is in this layout: Desktop Mode's own display and options where it has them.
+        val entries = { list: List<ItemConfig> -> list.map { StripEntry(it.now, (states[it.id] ?: Ticker.placeholder(it)).let { st ->
+            if (it.type == "spacer" && !dividers && st.divider) st.copy(divider = false) else st }) } }
         // Presenting (screen sharing): only what matters on stage, whatever its section.
         // While dragging, the bar shows the order the item would land in.
         val items = dragPreview.value?.let { (id, at) -> cfg.items.moved(id, Section.SHOWN, at) } ?: cfg.items
         // Presenting by choice, or because a maximized window lies under the strip (Desktop Mode's setting).
         val maxed by DesktopMode.maximized.collectAsState()
-        val presenting = cfg.presenting || maxed
+        // A portrait screen (a tablet held upright), when the user asks for presenting mode there.
+        val portrait = androidx.compose.ui.platform.LocalConfiguration.current.let { it.screenHeightDp > it.screenWidthDp }
+        val presenting = cfg.presenting || maxed || (cfg.portraitPresenting && portrait)
         val visible = (if (presenting) items.filter { it.sectionNow != Section.OFF && it.type in PRESENTING_TYPES && states[it.id]?.active == true }
         else items.filter { cfg.shows(it, states[it.id]?.active == true) })
-            // Next meeting stays at the far left: its text changes width most, and there it moves nothing else.
-            .sortedBy { if (it.type == Store.PINNED_LEFT) 0 else 1 }
         // Behind ‹ (click or hover modes): hidden items not out on their own. Show everything: none.
         val hidden = if (presenting) emptyList() else cfg.behindChevron { states[it.id]?.active == true }
         val overflow by BarOverflow.ids.collectAsState()
@@ -686,9 +689,9 @@ class BarController(private val service: AccessibilityService) {
         // ‹ stands at the end the position puts it, or at the side chosen for a centred strip.
         val chevronLeft = cfg.chevronOnLeft(cfg.positionNow)
         // Revealed in place: the hidden items take the places the layout gives them among the others, rather than
-        // unfolding on ‹'s side. (Next meeting stays at the far left, as always.)
+        // unfolding on ‹'s side.
         val inPlace = open && cfg.revealInPlace
-        val shownNow = if (inPlace) (visible + hidden).sortedWith(compareBy({ if (it.type == Store.PINNED_LEFT) 0 else 1 }, { items.indexOf(it) })) else visible
+        val shownNow = if (inPlace) (visible + hidden).sortedBy { items.indexOf(it) } else visible
         MeasuredStrip(bias = when (cfg.positionNow) { Position.RIGHT -> 1f; Position.CENTER -> 0f; Position.LEFT -> -1f },
             onWidth = { w -> if (w != strip.params.width || (w <= 0) != stripEmpty) main.post { applyWidth(w) } }) {
             Strip(
@@ -835,7 +838,7 @@ class BarController(private val service: AccessibilityService) {
         override fun gapClick(key: String) {
             val at = placed[key] ?: return
             if (key == "chevron") { chevron(at); return }
-            click(Store.config.value.items.firstOrNull { it.id == key } ?: return, at)
+            click(Store.config.value.items.firstOrNull { it.id == key }?.now ?: return, at)
         }
 
         override fun wheel(up: Boolean) {
@@ -1101,7 +1104,7 @@ class BarController(private val service: AccessibilityService) {
     companion object {
         private const val TOOLTIP_MAX_DP = 360
         /** Item types whose wheel only counts with [com.meridian11.books.bentobar.data.BarConfig.wheelAdjusts]: a stray scroll over a slider shouldn't move it. */
-        private val WHEEL_OPT_IN = setOf("sound", "media")
+        private val WHEEL_OPT_IN = setOf("sound", "media", "brightness")
         /** The window id of a floating strip's "bar" ([floatingSnapshot]): no real window has it, so no screenshot is asked of it. */
         private const val FLOATING_ID = -1
         /** How tall the floating strip is when Android gives no status bar height (a window caption is about this tall). */
@@ -1109,6 +1112,8 @@ class BarController(private val service: AccessibilityService) {
         /** [BarSnapshot.summary] of a floating strip: over a window's caption, or over the bare desktop. */
         private const val FLOAT_CAPTION = "floating:caption"
         private const val FLOAT_DESKTOP = "floating:desktop"
+        /** Half the width the strip keeps clear around the handle (•••) in the middle of a snapped window's top, in dp. */
+        private const val SNAP_HANDLE_HALF_DP = 36
         /** A maximized window lies under the strip (see [floatingSnapshot]): the strip is in presenting mode. */
         private const val FLOAT_MAXIMIZED = "floating:maximized"
         private const val RELEVANT = AccessibilityEvent.WINDOWS_CHANGE_ADDED or AccessibilityEvent.WINDOWS_CHANGE_REMOVED or

@@ -38,6 +38,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.material3.Switch
@@ -54,6 +57,8 @@ import androidx.compose.ui.res.stringResource
 import com.meridian11.books.bentobar.BuildConfig
 import com.meridian11.books.bentobar.R
 import com.meridian11.books.bentobar.data.ChevronSide
+import com.meridian11.books.bentobar.data.DesktopWhere
+import com.meridian11.books.bentobar.data.ItemConfig
 import com.meridian11.books.bentobar.data.ChipMode
 import com.meridian11.books.bentobar.data.ColorMode
 import com.meridian11.books.bentobar.data.DesktopAlign
@@ -101,11 +106,17 @@ fun AddPage(onAdded: (String) -> Unit) {
     val groups = listOf(
         AddGroup(R.string.add_group_system, listOf("cpu", "network", "memory", "battery", "storage", "heat", "devices", "displays")),
         AddGroup(R.string.add_group_time, listOf("calendar", "event", "clock", "timer", "countdown")),
-        AddGroup(R.string.add_group_tools, listOf("caffeine", "media", "sound", "clipboard", "tools", "shortcut", "folder", "app", "text", "spacer")),
+        AddGroup(R.string.add_group_tools, listOf("caffeine", "media", "sound", "brightness", "clipboard", "tools", "shortcut", "folder", "app", "text", "spacer")),
         // The only items that go online, in a group that says so.
         AddGroup(R.string.add_group_online, listOf("weather", "air", "flight", "stocks", "fx"), caption = R.string.add_group_online_caption),
     )
+    // With a layout of its own for Desktop Mode, an item can be added to both, to the regular bar only or to Desktop Mode only.
+    val own = cfg.floatWithoutBar && cfg.desktopSeparate
+    var addTo by remember { mutableStateOf(AddTo.BOTH) }
+    val added = { id: String -> if (own) Store.updateItem(id) { it.addedTo(addTo) }; onAdded(id) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 8.dp)) {
+        if (own) ChoiceRow(stringResource(R.string.add_to), listOf(AddTo.BOTH to stringResource(R.string.add_to_both),
+            AddTo.REGULAR to stringResource(R.string.add_to_regular), AddTo.DESKTOP to stringResource(R.string.add_to_desktop)), addTo) { addTo = it }
         groups.forEach { (group, types, caption) ->
             SectionLabel(stringResource(group))
             if (caption != null) Text(stringResource(caption), style = MaterialTheme.typography.bodySmall,
@@ -137,13 +148,13 @@ fun AddPage(onAdded: (String) -> Unit) {
                                 // shows when it has something to say. Its second button puts it in the bar for good.
                                 val quiet = type.addsWhenActive
                                 FilledTonalButton(onClick = {
-                                    onAdded(if (quiet) Store.add(type.type, Section.HIDDEN, type.defaultOptions(), whenActive = true)
+                                    added(if (quiet) Store.add(type.type, Section.HIDDEN, type.defaultOptions(), whenActive = true)
                                     else Store.add(type.type, Section.SHOWN, type.defaultOptions()))
                                 }) {
                                     SymIcon(Sym.ADD, size = 18.sp); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.add_add))
                                 }
                                 Spacer(Modifier.width(8.dp))
-                                TextButton(onClick = { onAdded(Store.add(type.type, if (quiet) Section.SHOWN else Section.HIDDEN, type.defaultOptions())) }) {
+                                TextButton(onClick = { added(Store.add(type.type, if (quiet) Section.SHOWN else Section.HIDDEN, type.defaultOptions())) }) {
                                     Text(stringResource(if (quiet) R.string.add_add_shown else R.string.add_add_hidden))
                                 }
                             }
@@ -154,6 +165,16 @@ fun AddPage(onAdded: (String) -> Unit) {
             Spacer(Modifier.height(16.dp))
         }
     }
+}
+
+/** Which layout an added item goes to, when Desktop Mode has one of its own. */
+private enum class AddTo { BOTH, REGULAR, DESKTOP }
+
+/** The item just added, placed for [to]: in both as it is, only in the regular bar (Off in Desktop Mode), or only in Desktop Mode (Off otherwise). */
+private fun ItemConfig.addedTo(to: AddTo): ItemConfig = when (to) {
+    AddTo.BOTH -> this
+    AddTo.REGULAR -> copy(desktop = DesktopWhere.OFF)
+    AddTo.DESKTOP -> copy(section = Section.OFF, desktop = if (section == Section.SHOWN) DesktopWhere.SHOWN else DesktopWhere.HIDDEN)
 }
 
 /** A group of the catalog: its heading, the types in it, and a line under the heading where the group needs one. */
@@ -204,6 +225,7 @@ fun LookPage() {
             ChoiceRow(stringResource(R.string.floating_chevron_side), listOf(ChevronSide.LEFT to stringResource(R.string.floating_chevron_left),
                 ChevronSide.RIGHT to stringResource(R.string.floating_chevron_right)), cfg.chevronCenter) { v -> Store.update { it.copy(chevronCenter = v) } }
         }
+        SwitchRow(stringResource(R.string.floating_portrait), cfg.portraitPresenting, help = stringResource(R.string.floating_portrait_help)) { on -> Store.update { it.copy(portraitPresenting = on) } }
         SwitchRow(stringResource(R.string.look_presenting), cfg.presenting, help = stringResource(R.string.look_presenting_help)) { on ->
             Store.update { it.copy(presenting = on) }
         }
@@ -212,6 +234,11 @@ fun LookPage() {
             TextSize.DEFAULT to stringResource(R.string.option_like_system), TextSize.LARGE to stringResource(R.string.look_text_large)), cfg.textSize) { v ->
             Store.update { it.copy(textSize = v) }
         }
+        // Desktop Mode's own text size and background, where it has a layout of its own; null follows the regular ones.
+        val own = cfg.floatWithoutBar && cfg.desktopSeparate
+        if (own) ChoiceRow(stringResource(R.string.floating_text_size), listOf<Pair<TextSize?, String>>(null to stringResource(R.string.floating_align_same),
+            TextSize.SMALL to stringResource(R.string.look_text_small), TextSize.DEFAULT to stringResource(R.string.option_like_system),
+            TextSize.LARGE to stringResource(R.string.look_text_large)), cfg.desktopTextSize) { v -> Store.update { it.copy(desktopTextSize = v) } }
         ChoiceRow(stringResource(R.string.look_color), listOf(ColorMode.AUTO to stringResource(R.string.look_color_auto),
             ColorMode.LIGHT to stringResource(R.string.look_color_light), ColorMode.DARK to stringResource(R.string.look_color_dark)), cfg.color,
             help = stringResource(R.string.look_color_help)) { v -> Store.update { it.copy(color = v) } }
@@ -219,6 +246,9 @@ fun LookPage() {
             Pill.SUBTLE to stringResource(R.string.look_pill_subtle), Pill.SOLID to stringResource(R.string.look_pill_solid)), cfg.pill) { v ->
             Store.update { it.copy(pill = v) }
         }
+        if (own) ChoiceRow(stringResource(R.string.floating_background), listOf<Pair<Pill?, String>>(null to stringResource(R.string.floating_align_same),
+            Pill.NONE to stringResource(R.string.look_pill_none), Pill.SUBTLE to stringResource(R.string.look_pill_subtle),
+            Pill.SOLID to stringResource(R.string.look_pill_solid)), cfg.desktopPill) { v -> Store.update { it.copy(desktopPill = v) } }
         SwitchRow(stringResource(R.string.look_hover_switch), cfg.hoverSwitchesPopups, help = stringResource(R.string.look_hover_switch_help)) { on ->
             Store.update { it.copy(hoverSwitchesPopups = on) }
         }
@@ -232,11 +262,14 @@ fun LookPage() {
         SwitchRow(stringResource(R.string.look_system_tint), cfg.systemTint, help = stringResource(R.string.look_system_tint_help)) { on ->
             Store.update { it.copy(systemTint = on) }
         }
+        SwitchRow(stringResource(R.string.floating_drag_only), cfg.dragOnlySliders, help = stringResource(R.string.floating_drag_only_help)) { on -> Store.update { it.copy(dragOnlySliders = on) } }
         SwitchRow(stringResource(R.string.floating_wheel), cfg.wheelAdjusts, help = stringResource(R.string.floating_wheel_help)) { on -> Store.update { it.copy(wheelAdjusts = on) } }
         PageLabel(stringResource(R.string.barmenu_hidden_items))
         ChoiceRow(stringResource(R.string.look_hidden_mode), listOf(HiddenMode.SHOW_ALL to stringResource(R.string.look_hidden_show_all),
             HiddenMode.CLICK to stringResource(R.string.look_hidden_click), HiddenMode.HOVER to stringResource(R.string.look_hidden_hover)),
             cfg.hiddenMode, help = stringResource(R.string.look_hidden_mode_help)) { v -> Store.update { it.copy(hiddenMode = v) } }
+        if (cfg.hiddenMode != HiddenMode.SHOW_ALL) SwitchRow(stringResource(R.string.floating_dividers), cfg.dividersOnExpand,
+            help = stringResource(R.string.floating_dividers_help)) { on -> Store.update { it.copy(dividersOnExpand = on) } }
         if (cfg.hiddenMode != HiddenMode.SHOW_ALL) SwitchRow(stringResource(R.string.floating_reveal_in_place), cfg.revealInPlace,
             help = stringResource(R.string.floating_reveal_in_place_help)) { on -> Store.update { it.copy(revealInPlace = on) } }
         // Folding back only applies when hidden items wait behind ‹.

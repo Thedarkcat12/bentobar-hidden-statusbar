@@ -93,6 +93,7 @@ import com.meridian11.books.bentobar.bar.StripEvents
 import com.meridian11.books.bentobar.bar.StripLook
 import com.meridian11.books.bentobar.bar.Contrast
 import com.meridian11.books.bentobar.data.chevronOnLeft
+import com.meridian11.books.bentobar.data.deskView
 import com.meridian11.books.bentobar.data.ColorMode
 import com.meridian11.books.bentobar.data.Display
 import com.meridian11.books.bentobar.data.ItemConfig
@@ -117,11 +118,17 @@ import java.time.ZonedDateTime
 fun BarPage(running: Boolean, selected: String?, onSelect: (String?) -> Unit, onSetup: () -> Unit) {
     val cfg by Store.config.collectAsState()
     val states by Ticker.states.collectAsState()
-    val item = cfg.items.firstOrNull { it.id == selected }
+    var desktopView by remember { mutableStateOf(false) }
+    // The Desktop Mode view (with a layout of its own): what is changed in an item's settings is its Desktop Mode settings.
+    val editing = desktopView && cfg.floatWithoutBar && cfg.desktopSeparate
+    androidx.compose.runtime.DisposableEffect(editing) {
+        com.meridian11.books.bentobar.data.DesktopMode.editing.value = editing
+        onDispose { com.meridian11.books.bentobar.data.DesktopMode.editing.value = false }
+    }
+    val item = cfg.items.firstOrNull { it.id == selected }?.let { if (editing) it.deskView() else it }
     val snackbar = remember { SnackbarHostState() }
     val deleted by Undo.deleted.collectAsState()
     val res = androidx.compose.ui.platform.LocalResources.current
-    var desktopView by remember { mutableStateOf(false) }
     LaunchedEffect(deleted) {
         val d = deleted ?: return@LaunchedEffect
         val name = Items.of(d.item.type)?.title ?: res.getString(R.string.bar_deleted_fallback)

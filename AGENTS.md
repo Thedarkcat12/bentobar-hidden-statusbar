@@ -18,6 +18,12 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
   - `bar/BarService.kt`: the AccessibilityService plus `BarController`. It scans the status bar,
     places the strip, hides it (fullscreen, keyguard, screen off, a shade covering the bar), runs
     menus, keep awake (a flag on the strip window) and colour sampling, and has adb `debug()` hooks.
+  - `bar/FloatingBand.kt`: Desktop Mode's placement (pure, unit-tested). Where a device has no status bar window (a tablet's PC
+    mode, with a taskbar), `BarController.floatingSnapshot` makes a floating strip along the top of the screen: the free stretches
+    beside the windows' buttons (`gaps`), the stretch that holds the strip where its alignment puts it (`place`), the handles of snapped
+    windows kept clear of, and the maximized app (`maximizedApp`) that puts the bar in presenting mode. `DesktopMode` (in
+    `data/Model.kt`) says whether that layout is active; with `BarConfig.desktopSeparate` it has its own alignment, offset, text
+    size, background and per-item place, display and options (`sectionNow`, `positionNow`, `textSizeNow`, `ItemConfig.now`).
   - `bar/StatusBarScan.kt`: finds the status bar window (TYPE_SYSTEM at y=0) and the free area
     (the `DesktopStatusBarSpacer` node on Googlebook OS, else the widest gap).
   - `bar/BarPixels.kt`: the status bar's text and background color from the pixels around its clock

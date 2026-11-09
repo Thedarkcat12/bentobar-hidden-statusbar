@@ -45,6 +45,10 @@ data class ItemConfig(
     val options: Map<String, String> = emptyMap(),
     /** Where the item lives while Desktop Mode is active: [DesktopWhere.SAME] (as [section]), or a section of its own. */
     val desktop: DesktopWhere = DesktopWhere.SAME,
+    /** With Desktop Mode's own layout: the item's display there, or null for the same as [display]. */
+    val deskDisplay: Display? = null,
+    /** With Desktop Mode's own layout: the item's options there, or null for the same as [options]. */
+    val deskOptions: Map<String, String>? = null,
 ) {
     fun opt(key: String, default: String) = options[key] ?: default
     fun optInt(key: String, default: Int) = options[key]?.toIntOrNull() ?: default
@@ -115,6 +119,15 @@ data class BarConfig(
     val popupOpaque: Int = DEFAULT_POPUP_OPAQUE,
     /** Where ‹ sits when the strip is centred (at the left or right end it stands at the end next to the screen's middle). */
     val chevronCenter: ChevronSide = ChevronSide.LEFT,
+    /** Text size and background in Desktop Mode's own layout, or null for the regular ones. */
+    val desktopTextSize: TextSize? = null,
+    val desktopPill: Pill? = null,
+    /** The volume, brightness and Now playing sliders move only by a drag: a click on one sets nothing. */
+    val dragOnlySliders: Boolean = false,
+    /** Divider lines (a Spacer's) show only while ‹ has been pressed and the hidden items are out. */
+    val dividersOnExpand: Boolean = false,
+    /** A portrait screen (a tablet held upright) puts the bar in presenting mode. */
+    val portraitPresenting: Boolean = false,
     /** Pressing ‹ puts the hidden items where they belong in the layout, instead of unfolding them on the side ‹ is on. */
     val revealInPlace: Boolean = false,
     /** The mouse wheel over the volume or Now playing item changes its level or place. Off: only a click or a drag does. */
@@ -247,10 +260,35 @@ object DesktopMode {
     val active = kotlinx.coroutines.flow.MutableStateFlow(false)
     /** A window is maximized while floating, and the user asked for presenting mode then ([BarConfig.desktopHideMaximized]). */
     val maximized = kotlinx.coroutines.flow.MutableStateFlow(false)
+    /** The Bar page is showing the Desktop Mode view: changes to an item's display and options are its Desktop Mode ones. */
+    val editing = kotlinx.coroutines.flow.MutableStateFlow(false)
 }
 
 /** Where the strip sits right now: [BarConfig.desktopAlign] while Desktop Mode is active, else [BarConfig.position]. */
 val BarConfig.positionNow: Position get() = if (DesktopMode.active.value) desktopAlign.resolve(position) else position
+
+/** The text size and the background right now: Desktop Mode's own where it has one. */
+val BarConfig.textSizeNow: TextSize get() = if (DesktopMode.active.value) desktopTextSize ?: textSize else textSize
+val BarConfig.pillNow: Pill get() = if (DesktopMode.active.value) desktopPill ?: pill else pill
+
+/** [this] with the settings it has in Desktop Mode's own layout (its display and options), when it has any. */
+fun ItemConfig.deskView(): ItemConfig =
+    if (deskDisplay == null && deskOptions == null) this else copy(display = deskDisplay ?: display, options = deskOptions ?: options)
+
+/** The item as it is right now: with its Desktop Mode settings while that layout is active. */
+val ItemConfig.now: ItemConfig get() = if (DesktopMode.active.value) deskView() else this
+
+/**
+ * [change] applied for Desktop Mode's layout: the item's display and options it makes go to the item's own Desktop Mode
+ * settings (which start as a copy of the regular ones the first time they differ), the rest as usual.
+ */
+fun ItemConfig.changedInDesktop(change: (ItemConfig) -> ItemConfig): ItemConfig {
+    val view = deskView()
+    val plain = change(this)
+    val made = change(view)
+    if (made.display == view.display && made.options == view.options) return plain.copy(display = display, options = options)
+    return plain.copy(display = display, options = options, deskDisplay = made.display, deskOptions = made.options)
+}
 
 /** How far below the top of the screen the strip sits right now, in dp. */
 val BarConfig.offsetYNowDp: Int get() = (if (DesktopMode.active.value) desktopOffsetYDp else offsetYDp).coerceIn(0, MAX_OFFSET_Y_DP)

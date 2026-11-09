@@ -7,6 +7,7 @@ import android.util.Log
 import com.meridian11.books.bentobar.R
 import com.meridian11.books.bentobar.data.BarConfig
 import com.meridian11.books.bentobar.data.ItemConfig
+import com.meridian11.books.bentobar.data.now
 import com.meridian11.books.bentobar.data.Store
 import com.meridian11.books.bentobar.util.Now
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,7 +18,7 @@ object Items {
     val all: List<ItemType> = listOf(
         CpuItem, NetworkItem, BatteryItem, MemoryItem, StorageItem, HeatItem, DevicesItem, DisplaysItem,
         CalendarItem, EventItem, ClockItem, TimerItem, CountdownItem,
-        CaffeineItem, MediaItem, SoundItem, ClipboardItem, ToolsItem, ShortcutItem, FolderItem, AppItem, TextItem, SpacerItem,
+        CaffeineItem, MediaItem, SoundItem, BrightnessItem, ClipboardItem, ToolsItem, ShortcutItem, FolderItem, AppItem, TextItem, SpacerItem,
         WeatherItem, AirItem, FlightItem, StocksItem, FxItem,
     )
     private val byType = all.associateBy { it.type }
@@ -105,7 +106,7 @@ object Ticker {
     @Volatile var focusItem: String? = null
 
     /** Items worth sampling now: [TickRules.needed]. */
-    private fun needed(cfg: BarConfig): List<ItemConfig> = TickRules.needed(cfg, "settings" in users, revealHidden, focusItem)
+    private fun needed(cfg: BarConfig): List<ItemConfig> = TickRules.needed(cfg, "settings" in users, revealHidden, focusItem).map { it.now }
 
     private val loop = object : Runnable {
         override fun run() {

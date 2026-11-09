@@ -159,7 +159,20 @@ object MediaItem : ItemType("media", R.string.item_media_title, Sym.MUSIC_NOTE, 
     }
 
     override val usesWheel = true
-    override fun onScroll(item: ItemConfig, steps: Int) = NowPlaying.volume(steps)
+    /**
+     * The wheel over the item: with its progress bar on and a track that can be moved, it seeks ([WHEEL_SEEK_MS] a notch,
+     * forward when it turns away from the user as the volume's up does); else it is the media volume.
+     */
+    override fun onScroll(item: ItemConfig, steps: Int) {
+        val main = NowPlaying.state.value.main
+        if (main != null && MediaText.progress(item.options) && main.canSeek && main.durationMs > 0) {
+            val to = (main.position(Now.elapsed()) + steps * WHEEL_SEEK_MS).coerceIn(0, main.durationMs)
+            soughtLevel = (to.toFloat() / main.durationMs).coerceIn(0f, 1f)
+            soughtAt = Now.elapsed()
+            NowPlaying.seekTo(main.key, to)
+        } else NowPlaying.volume(steps)
+    }
+    private const val WHEEL_SEEK_MS = 10_000L
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { item, host -> MediaMenu(item, host) }
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set -> MediaOptions(item, set) }

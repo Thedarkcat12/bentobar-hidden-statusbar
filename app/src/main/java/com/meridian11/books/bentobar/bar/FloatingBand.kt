@@ -42,50 +42,26 @@ object FloatingBand {
         windows.filter { it.left <= slack && it.right >= screenW - slack && it.top <= slack && it.bottom >= screenH * 7 / 10 }
 
     /**
-     * The maximized app among [fills], top-most first: an app has no caption of its own to sit in then, so its own top bar
-     * lies under the strip. The desktop fills the screen as well; with two or more, the top one is an app (the desktop is
-     * under it), and a lone one is an app only when [isDesktop] says it is not the desktop.
+     * The windows snapped to one side or a part of the screen (split screen): from the top edge down, but not across the
+     * whole width. They have no caption, only a handle at the middle of their top, which the strip keeps clear of
+     * ([handles]). A window's own width is what it is: one narrower than [minWidth] has no room for a handle.
      */
-    fun maximizedApp(fills: List<AppWindow>, isDesktop: (AppWindow) -> Boolean): AppWindow? =
-        if (fills.size >= 2) fills.first() else fills.singleOrNull()?.takeIf { !isDesktop(it) }
+    fun snapped(windows: List<AppWindow>, screenW: Int, screenH: Int, slack: Int = 12, minWidth: Int = 0): List<AppWindow> =
+        windows.filter { it.top <= slack && it.bottom >= screenH * 7 / 10 && it.right - it.left < screenW - 2 * slack && it.right - it.left >= minWidth }
+
+    /** The spans around the middles of [snapped] windows, [half] either side, for [gaps]'s `blocked`. */
+    fun handles(snapped: List<AppWindow>, half: Int): List<Pair<Int, Int>> =
+        snapped.map { val mid = (it.left + it.right) / 2; (mid - half) to (mid + half) }
 
     /**
-     * True when an app window covers the whole display: a full-screen app has no caption and no
-     * taskbar, and the strip would sit on top of its content, so it goes away as the status bar does.
-     * [slack] absorbs the pixel or two a window's bounds can fall short by.
+     * The maximized app among [fills], top-most first: an app has no caption of its own to sit in then, so its own top bar lies
+     * under the strip. The desktop's window fills the screen as well, and reaches the display's bottom, under the taskbar, where
+     * an app maximized by the system stops above it. So a window that ends above the bottom is an app; of windows that reach
+     * it, the top one is when there are two or more (the desktop is under it), and a lone one is the desktop, or an app that is
+     * full screen and has no strip to show anyway.
      */
-    fun coversDisplay(windows: List<AppWindow>, screenW: Int, screenH: Int, slack: Int = 2): Boolean =
-        windows.any { it.left <= slack && it.top <= slack && it.right >= screenW - slack && it.bottom >= screenH - slack }
-
-    /**
-     * The stretches of the band, from [bandTop] to [bandBottom], that no caption's [title] or [controls]
-     * reserve takes, keeping [edge] pixels from each side of the screen, left to right.
-     *
-     * Only windows that reach into the band count, and only those wide enough to have a caption with
-     * both ends (a menu or a tooltip near the top edge has none).
-     */
-    fun gaps(windows: List<AppWindow>, screenW: Int, bandTop: Int, bandBottom: Int, edge: Int, title: Int, controls: Int): List<Free> {
-        val minWidth = title + controls
-        val taken = ArrayList<Pair<Int, Int>>()
-        for (w in windows) {
-            if (w.top >= bandBottom || w.bottom <= bandTop || w.right - w.left < minWidth) continue
-            val left = w.left.coerceIn(0, screenW)
-            val right = w.right.coerceIn(0, screenW)
-            // A reserve of nothing is no stretch at all: as a zero-width span it would still cut a free stretch in two.
-            if (title > 0) taken += left to minOf(right, left + title)
-            if (controls > 0) taken += maxOf(left, right - controls) to right
-        }
-        val out = ArrayList<Free>()
-        var cursor = edge
-        val end = screenW - edge
-        for ((l, r) in taken.sortedBy { it.first }) {
-            val gapEnd = minOf(l, end)
-            if (gapEnd > cursor) out += Free(cursor, gapEnd)
-            cursor = maxOf(cursor, r)
-        }
-        if (end > cursor) out += Free(cursor, end)
-        return out
-    }
+    fun maximizedApp(fills: List<AppWindow>, screenH: Int, slack: Int = 12): AppWindow? =
+        fills.firstOrNull { it.bottom < screenH - slack } ?: fills.takeIf { it.size >= 2 }?.first()
 
     /**
      * The stretch the strip may use, when it wants [need] pixels (0 when not known yet) and is aligned by
@@ -94,9 +70,9 @@ object FloatingBand {
      */
     fun place(
         windows: List<AppWindow>, screenW: Int, bandTop: Int, bandBottom: Int, edge: Int, title: Int, controls: Int,
-        need: Int, align: Position,
+        need: Int, align: Position, blocked: List<Pair<Int, Int>> = emptyList(),
     ): Free {
-        val gaps = gaps(windows, screenW, bandTop, bandBottom, edge, title, controls)
+        val gaps = gaps(windows, screenW, bandTop, bandBottom, edge, title, controls, blocked)
         if (gaps.isEmpty()) return Free(edge, edge)
         val whole = Free(edge, screenW - edge)
         val wanted = sits(whole, need, align, screenW)

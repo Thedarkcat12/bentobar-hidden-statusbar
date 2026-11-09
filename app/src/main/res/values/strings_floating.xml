@@ -20,7 +20,7 @@
     <string name="floating_view">Show items as in</string>
     <string name="floating_view_regular">Regular</string>
     <string name="floating_view_desktop">Desktop Mode</string>
-    <string name="floating_view_help">What you put in each card here is where the item goes while Desktop Mode is active. The order is shared with the regular bar.</string>
+    <string name="floating_view_help">Desktop Mode has a layout of its own: what you put in each card here, and each item\'s settings, apply only while it is active. Items are ordered as in the regular bar, and an item that is Same as usual follows that bar\'s card.</string>
     <string name="floating_edge">Distance from the screen\'s sides</string>
     <string name="floating_hide_max">Presenting mode over maximized windows</string>
     <string name="floating_hide_max_help">While a window is maximized it has no title bar of the system\'s to sit in, and an app\'s own top bar would lie under BentoBar. BentoBar then shows only a running timer or a meeting about to start, plus ‹, as in Presenting mode, and comes back when the window is smaller.</string>
@@ -34,4 +34,16 @@
     <string name="floating_wheel">Mouse wheel changes sliders</string>
     <string name="floating_wheel_help">The wheel over the volume or Now playing item changes its level or place. Off: only a click or a drag does.</string>
     <string name="section_shown_popups">Items with a Show when… rule sit where they will pop in.</string>
+    <string name="floating_text_size">Text size in Desktop Mode</string>
+    <string name="floating_background">Background in Desktop Mode</string>
+    <string name="floating_drag_only">Only a drag moves sliders</string>
+    <string name="floating_drag_only_help">A click on the volume, brightness or Now playing slider sets nothing: it moves only when you drag it.</string>
+    <string name="floating_portrait">Presenting mode in portrait</string>
+    <string name="floating_portrait_help">While the screen is upright (taller than wide), BentoBar shows only a running timer or a meeting about to start, plus ‹, as in Presenting mode.</string>
+    <string name="floating_dividers">Divider lines only when expanded</string>
+    <string name="floating_dividers_help">Spacers\' divider lines show only after ‹ is pressed and the hidden items are out.</string>
+    <string name="add_to">Add to</string>
+    <string name="add_to_both">Both</string>
+    <string name="add_to_regular">Regular bar</string>
+    <string name="add_to_desktop">Desktop Mode</string>
 </resources>
