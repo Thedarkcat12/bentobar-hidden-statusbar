@@ -64,6 +64,47 @@ object FloatingBand {
         fills.firstOrNull { it.bottom < screenH - slack } ?: fills.takeIf { it.size >= 2 }?.first()
 
     /**
+     * True when an app window covers the whole display: a full-screen app has no caption and no
+     * taskbar, and the strip would sit on top of its content, so it goes away as the status bar does.
+     * [slack] absorbs the pixel or two a window's bounds can fall short by.
+     */
+    fun coversDisplay(windows: List<AppWindow>, screenW: Int, screenH: Int, slack: Int = 2): Boolean =
+        windows.any { it.left <= slack && it.top <= slack && it.right >= screenW - slack && it.bottom >= screenH - slack }
+
+    /**
+     * The stretches of the band, from [bandTop] to [bandBottom], that no caption's [title] or [controls]
+     * reserve takes, keeping [edge] pixels from each side of the screen, left to right. [blocked] are spans
+     * the system draws its own things in (a snapped window's handle), kept clear of whatever the windows are.
+     *
+     * Only windows that reach into the band count, and only those wide enough to have a caption with
+     * both ends (a menu or a tooltip near the top edge has none).
+     */
+    fun gaps(windows: List<AppWindow>, screenW: Int, bandTop: Int, bandBottom: Int, edge: Int, title: Int, controls: Int,
+             blocked: List<Pair<Int, Int>> = emptyList()): List<Free> {
+        val minWidth = title + controls
+        val taken = ArrayList<Pair<Int, Int>>()
+        for (w in windows) {
+            if (w.top >= bandBottom || w.bottom <= bandTop || w.right - w.left < minWidth) continue
+            val left = w.left.coerceIn(0, screenW)
+            val right = w.right.coerceIn(0, screenW)
+            // A reserve of nothing is no stretch at all: as a zero-width span it would still cut a free stretch in two.
+            if (title > 0) taken += left to minOf(right, left + title)
+            if (controls > 0) taken += maxOf(left, right - controls) to right
+        }
+        for ((l, r) in blocked) if (r > l) taken += l.coerceIn(0, screenW) to r.coerceIn(0, screenW)
+        val out = ArrayList<Free>()
+        var cursor = edge
+        val end = screenW - edge
+        for ((l, r) in taken.sortedBy { it.first }) {
+            val gapEnd = minOf(l, end)
+            if (gapEnd > cursor) out += Free(cursor, gapEnd)
+            cursor = maxOf(cursor, r)
+        }
+        if (end > cursor) out += Free(cursor, end)
+        return out
+    }
+
+    /**
      * The stretch the strip may use, when it wants [need] pixels (0 when not known yet) and is aligned by
      * [align]: the stretch that holds the strip where its alignment puts it, if there is one; else the
      * nearest stretch wide enough for it; else the widest. Nothing at all gives an empty stretch.
