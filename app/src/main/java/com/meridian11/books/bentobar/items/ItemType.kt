@@ -41,6 +41,8 @@ data class BarProgress(
     val seekable: Boolean = true,
     /** The fill's color as ARGB (a cover's), or 0 for the bar's own. */
     val tint: Int = 0,
+    /** The player is playing: a wavy bar waves only then. */
+    val playing: Boolean = true,
 )
 
 /**

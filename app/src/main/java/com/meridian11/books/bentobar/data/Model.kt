@@ -113,6 +113,12 @@ data class BarConfig(
     val wavyBars: Boolean = false,
     /** How solid the popups are, in percent: 50 is the look they were made with, 100 a solid card, less lets more of the screen show through. */
     val popupOpaque: Int = DEFAULT_POPUP_OPAQUE,
+    /** Where ‹ sits when the strip is centred (at the left or right end it stands at the end next to the screen's middle). */
+    val chevronCenter: ChevronSide = ChevronSide.LEFT,
+    /** Pressing ‹ puts the hidden items where they belong in the layout, instead of unfolding them on the side ‹ is on. */
+    val revealInPlace: Boolean = false,
+    /** The mouse wheel over the volume or Now playing item changes its level or place. Off: only a click or a drag does. */
+    val wheelAdjusts: Boolean = false,
     /**
      * Desktop Mode: with no status bar at all (a tablet's desktop windowing keeps its clock and icons in a taskbar),
      * float along the top of the screen instead of going away. Full-screen apps still hide it. Off by default: where
@@ -120,17 +126,22 @@ data class BarConfig(
      * (The name is from before it was called Desktop Mode: saved layouts hold it.)
      */
     val floatWithoutBar: Boolean = false,
+    /** Desktop Mode has a layout of its own (alignment, distance from the top, each item's place). Off: it is the regular one. */
+    val desktopSeparate: Boolean = false,
     /** Desktop Mode: dp kept clear at the left end of a window's caption (its icon and name). */
     val floatTitleDp: Int = 200,
     /** Desktop Mode: dp kept clear at the right end of a window's caption (its buttons, with room for one more). */
     val floatControlsDp: Int = 220,
     /** Desktop Mode: where the strip sits, or [DesktopAlign.SAME]: as in [position]. */
     val desktopAlign: DesktopAlign = DesktopAlign.SAME,
-    /** Desktop Mode: when the strip doesn't fit beside a window's buttons, cover the icon and name instead of dropping items. */
-    val desktopOverlap: Boolean = false,
+    /**
+     * Desktop Mode: the strip stays where its alignment puts it and lies over a window's icon and name when they are
+     * there (never over its buttons). Off: it keeps clear of [floatTitleDp] at a window's left too.
+     */
+    val desktopOverlap: Boolean = true,
     /** Desktop Mode: dp between the screen's left or right edge and the strip (its pill, or its items without one) when it sits at an edge. */
     val desktopEdgeDp: Int = 0,
-    /** Desktop Mode: the strip steps aside while a window is maximized (fills the screen above the taskbar), where an app's own top bar would lie under it. */
+    /** Desktop Mode: while a window is maximized (no caption of its own to sit in, an app's own top bar lies under the strip) the strip goes into presenting mode. */
     val desktopHideMaximized: Boolean = false,
     /** How far below the top of the screen the strip sits, in dp. */
     val offsetYDp: Int = 0,
@@ -208,6 +219,17 @@ val ItemConfig.sectionNow: Section get() = when {
     else -> when (desktop) { DesktopWhere.SAME -> section; DesktopWhere.SHOWN -> Section.SHOWN; DesktopWhere.HIDDEN -> Section.HIDDEN; DesktopWhere.OFF -> Section.OFF }
 }
 
+/** Where ‹ stands when the strip is centred. */
+@Serializable
+enum class ChevronSide { LEFT, RIGHT }
+
+/** Whether ‹ stands at the strip's left end, for a strip placed at [position]. */
+fun BarConfig.chevronOnLeft(position: Position): Boolean = when (position) {
+    Position.LEFT -> false
+    Position.RIGHT -> true
+    Position.CENTER -> chevronCenter == ChevronSide.LEFT
+}
+
 /** Where the strip sits while Desktop Mode is active: as usual, or one of the three places. */
 @Serializable
 enum class DesktopAlign {
@@ -221,7 +243,10 @@ enum class DesktopAlign {
  * strip, the ticker and the menus all follow one rule.
  */
 object DesktopMode {
+    /** Floating, with a layout of its own ([BarConfig.desktopSeparate]): what [sectionNow], [positionNow] and [offsetYNowDp] follow. */
     val active = kotlinx.coroutines.flow.MutableStateFlow(false)
+    /** A window is maximized while floating, and the user asked for presenting mode then ([BarConfig.desktopHideMaximized]). */
+    val maximized = kotlinx.coroutines.flow.MutableStateFlow(false)
 }
 
 /** Where the strip sits right now: [BarConfig.desktopAlign] while Desktop Mode is active, else [BarConfig.position]. */

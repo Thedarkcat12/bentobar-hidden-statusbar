@@ -14,7 +14,7 @@
     <string name="floating_item_where_help">Where this item goes while Desktop Mode is active, so it can show or hide along with the status bar.</string>
     <string name="floating_where_same">Same as usual</string>
     <string name="floating_overlap">Overlay window titles</string>
-    <string name="floating_overlap_help">When BentoBar\'s icons would collide with a window\'s title bar, they keep showing and lie over the app\'s icon and name instead of being hidden. They never cover the window\'s buttons.</string>
+    <string name="floating_overlap_help">BentoBar stays where its alignment puts it and lies over a window\'s icon and name when they are there. It never covers the window\'s buttons. Off: it moves aside to keep clear of the icon and name too.</string>
     <string name="floating_offset">Distance from the top</string>
     <string name="floating_offset_desktop">Distance from the top in Desktop Mode</string>
     <string name="floating_view">Show items as in</string>
@@ -22,7 +22,16 @@
     <string name="floating_view_desktop">Desktop Mode</string>
     <string name="floating_view_help">What you put in each card here is where the item goes while Desktop Mode is active. The order is shared with the regular bar.</string>
     <string name="floating_edge">Distance from the screen\'s sides</string>
-    <string name="floating_hide_max">Hide over maximized windows</string>
-    <string name="floating_hide_max_help">While a window is maximized (it fills the screen above the taskbar), BentoBar steps aside, since an app\'s own top bar would lie under it. It comes back when the window is smaller.</string>
+    <string name="floating_hide_max">Presenting mode over maximized windows</string>
+    <string name="floating_hide_max_help">While a window is maximized it has no title bar of the system\'s to sit in, and an app\'s own top bar would lie under BentoBar. BentoBar then shows only a running timer or a meeting about to start, plus ‹, as in Presenting mode, and comes back when the window is smaller.</string>
+    <string name="floating_separate">Separate layout in Desktop Mode</string>
+    <string name="floating_separate_help">Off: Desktop Mode looks like the regular bar. On: it has its own alignment, distance from the top and place for each item (the Bar page then shows a Desktop Mode view).</string>
+    <string name="floating_chevron_side">Where ‹ stands when the bar is in the middle</string>
+    <string name="floating_chevron_left">Left</string>
+    <string name="floating_chevron_right">Right</string>
+    <string name="floating_reveal_in_place">Reveal hidden items in place</string>
+    <string name="floating_reveal_in_place_help">Pressing ‹ puts each hidden item where it sits in the layout, among the others, instead of unfolding them all on the side ‹ is on.</string>
+    <string name="floating_wheel">Mouse wheel changes sliders</string>
+    <string name="floating_wheel_help">The wheel over the volume or Now playing item changes its level or place. Off: only a click or a drag does.</string>
     <string name="section_shown_popups">Items with a Show when… rule sit where they will pop in.</string>
 </resources>

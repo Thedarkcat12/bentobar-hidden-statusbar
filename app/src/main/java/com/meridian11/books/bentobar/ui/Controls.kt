@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -112,15 +113,16 @@ fun TextRow(label: String, value: String, help: String? = null, placeholder: Str
 }
 
 @Composable
-fun SliderRow(label: String, value: Int, range: IntRange, format: (Int) -> String = { it.toString() }, onChange: (Int) -> Unit) {
+fun SliderRow(label: String, value: Int, range: IntRange, format: (Int) -> String = { it.toString() }, enabled: Boolean = true, onChange: (Int) -> Unit) {
     var v by remember { mutableFloatStateOf(value.toFloat()) }
     LaunchedEffect(value) { v = value.toFloat() }
-    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+    // Greyed out when it has no effect right now, with its value still shown.
+    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp).alpha(if (enabled) 1f else 0.38f)) {
         Row {
             Text(label, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
             Text(format(v.toInt()), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
         }
-        Slider(value = v, onValueChange = { v = it }, onValueChangeFinished = { onChange(v.toInt()) },
+        Slider(value = v, onValueChange = { v = it }, enabled = enabled, onValueChangeFinished = { onChange(v.toInt()) },
             valueRange = range.first.toFloat()..range.last.toFloat(), steps = (range.last - range.first - 1).coerceIn(0, 40),
             modifier = Modifier.semantics { contentDescription = label })
     }

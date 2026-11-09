@@ -45,4 +45,24 @@ class ArtColorTest {
         val c = 0xFFFFA0A0.toInt()
         assertEquals(c, ArtColor.forBackground(c, dark = true))
     }
+
+    @Test fun theCardTonesAreDeepOnDarkAndPaleOnLightAndKeepTheHue() {
+        for (art in listOf(red, blue, 0xFFE0A030.toInt())) {
+            assertTrue(ArtColor.luminance(ArtColor.surface(art, dark = true)) < 0.08f)
+            assertTrue(ArtColor.luminance(ArtColor.container(art, dark = true)) < 0.2f)
+            assertTrue(ArtColor.luminance(ArtColor.surface(art, dark = false)) > 0.6f)
+            assertTrue(ArtColor.luminance(ArtColor.container(art, dark = false)) > 0.4f)
+        }
+        // Red stays the strongest channel in every tone of a red cover.
+        for (c in listOf(ArtColor.surface(red, true), ArtColor.container(red, true), ArtColor.track(red, true), ArtColor.container(red, false))) {
+            val r = (c shr 16) and 0xFF
+            assertTrue(r >= ((c shr 8) and 0xFF) && r >= (c and 0xFF))
+        }
+    }
+
+    @Test fun theTrackLiesBetweenTheContainerAndAnAccentOnDark() {
+        val l = { c: Int -> ArtColor.luminance(c) }
+        assertTrue(l(ArtColor.track(blue, true)) > l(ArtColor.container(blue, true)))
+        assertTrue(l(ArtColor.forBackground(blue, true)) > l(ArtColor.track(blue, true)))
+    }
 }

@@ -4,6 +4,7 @@ import com.meridian11.books.bentobar.bar.FloatingBand.Free
 import com.meridian11.books.bentobar.data.Position
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -143,18 +144,41 @@ class FloatingBandTest {
         assertEquals(null, FloatingBand.taskbarTop(emptyList(), screenW, screenH))
     }
 
-    @Test fun aWindowFromTheTopEdgeToTheTaskbarAcrossTheWidthIsMaximized() {
-        val floor = screenH - 108
-        assertTrue(FloatingBand.isMaximized(listOf(AppWindow(1, 0, 0, screenW, floor)), screenW, floor))
-        assertTrue(FloatingBand.isMaximized(listOf(AppWindow(1, 0, 0, screenW, floor - 1)), screenW, floor))
+    @Test fun aWindowFromTheTopEdgeAcrossTheWidthFillsTheScreen() {
+        val screenH = 1250 // shadows the class's 1200
+        assertEquals(1, FloatingBand.fills(listOf(AppWindow(1, 0, 0, screenW, 1160)), screenW, screenH).size)
+        assertEquals(1, FloatingBand.fills(listOf(AppWindow(1, 0, 0, screenW, screenH)), screenW, screenH).size)
+        assertEquals(1, FloatingBand.fills(listOf(AppWindow(1, 4, 0, screenW - 4, 1100)), screenW, screenH).size)
     }
 
-    @Test fun aFloatingOrSnappedWindowIsNotMaximized() {
-        val floor = screenH - 108
-        assertFalse(FloatingBand.isMaximized(listOf(AppWindow(1, 100, 40, 1500, 900)), screenW, floor))
-        assertFalse(FloatingBand.isMaximized(listOf(AppWindow(1, 0, 0, screenW / 2, floor)), screenW, floor))
-        assertFalse(FloatingBand.isMaximized(listOf(AppWindow(1, 0, 60, screenW, floor)), screenW, floor))
-        assertFalse(FloatingBand.isMaximized(emptyList(), screenW, floor))
+    @Test fun aFloatingOrSnappedWindowDoesNotFillTheScreen() {
+        val screenH = 1250 // shadows the class's 1200
+        assertTrue(FloatingBand.fills(listOf(AppWindow(1, 100, 40, 1500, 900)), screenW, screenH).isEmpty())
+        assertTrue(FloatingBand.fills(listOf(AppWindow(1, 0, 0, screenW / 2, 1160)), screenW, screenH).isEmpty())
+        assertTrue(FloatingBand.fills(listOf(AppWindow(1, 0, 60, screenW, 1160)), screenW, screenH).isEmpty())
+        assertTrue(FloatingBand.fills(listOf(AppWindow(1, 0, 0, screenW, 300)), screenW, screenH).isEmpty())
+        assertTrue(FloatingBand.fills(emptyList(), screenW, screenH).isEmpty())
+    }
+
+    @Test fun theTopOfTwoFillingWindowsIsTheAppAndALoneOneIsAnAppOnlyIfItIsNotTheDesktop() {
+        val app = AppWindow(1, 0, 0, screenW, 1160)
+        val desktop = AppWindow(2, 0, 0, screenW, 1250)
+        assertEquals(app, FloatingBand.maximizedApp(listOf(app, desktop)) { false })
+        assertEquals(app, FloatingBand.maximizedApp(listOf(app)) { false })
+        assertNull(FloatingBand.maximizedApp(listOf(desktop)) { it.id == 2 })
+        assertNull(FloatingBand.maximizedApp(emptyList()) { false })
+    }
+
+    @Test fun noTitleReserveDoesNotSplitTheBand() {
+        // An overlay setting that keeps no room at a window's left must leave the free stretch whole up to the buttons.
+        val g = FloatingBand.gaps(listOf(AppWindow(1, 697, 0, 2700, 900)), 2000, 0, 40, 0, title = 0, controls = 220)
+        assertEquals(listOf(FloatingBand.Free(0, 1780)), g)
+    }
+
+    @Test fun overlayingATitleKeepsTheCentredStripWhereItIs() {
+        val w = listOf(AppWindow(1, 697, 0, 2700, 900))
+        val f = FloatingBand.place(w, 2000, 0, 40, 0, title = 0, controls = 220, need = 800, align = Position.CENTER)
+        assertEquals(FloatingBand.Free(0, 1780), f)
     }
 
     @Test fun aMaximizedWindowAboveTheTaskbarIsNotFullScreen() {

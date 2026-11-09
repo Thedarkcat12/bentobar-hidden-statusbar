@@ -118,7 +118,7 @@ object MediaItem : ItemType("media", R.string.item_media_title, Sym.MUSIC_NOTE, 
         val now = Now.elapsed()
         val level = if (now - soughtAt in 0..SOUGHT_MS) soughtLevel
         else (main.position(now).toFloat() / main.durationMs).coerceIn(0f, 1f)
-        return BarProgress(level, main.canSeek, if (MediaText.artColor(item.options)) coverColor(main.art) ?: 0 else 0)
+        return BarProgress(level, main.canSeek, if (MediaText.artColor(item.options)) coverColor(main.art) ?: 0 else 0, main.playing)
     }
 
     /** A drag on the progress bar, let go at [level]: the player is sent there. */

@@ -92,6 +92,7 @@ import com.meridian11.books.bentobar.bar.StripEntry
 import com.meridian11.books.bentobar.bar.StripEvents
 import com.meridian11.books.bentobar.bar.StripLook
 import com.meridian11.books.bentobar.bar.Contrast
+import com.meridian11.books.bentobar.data.chevronOnLeft
 import com.meridian11.books.bentobar.data.ColorMode
 import com.meridian11.books.bentobar.data.Display
 import com.meridian11.books.bentobar.data.ItemConfig
@@ -140,7 +141,7 @@ fun BarPage(running: Boolean, selected: String?, onSelect: (String?) -> Unit, on
             if (wide) {
                 Row(Modifier.weight(1f)) {
                     Column(Modifier.width(470.dp).fillMaxHeight().verticalScroll(listScroll)) {
-                        Sections(cfg.items, states, selected, onSelect, listScroll, desktopView && cfg.floatWithoutBar) { desktopView = it }
+                        Sections(cfg.items, states, selected, onSelect, listScroll, desktopView && cfg.floatWithoutBar && cfg.desktopSeparate) { desktopView = it }
                     }
                     Spacer(Modifier.width(20.dp))
                     Box(Modifier.weight(1f).fillMaxHeight()) {
@@ -153,7 +154,7 @@ fun BarPage(running: Boolean, selected: String?, onSelect: (String?) -> Unit, on
                     if (item != null) {
                         TextButton(onClick = { onSelect(null) }) { SymIcon(Sym.ARROW_BACK, size = 18.sp); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.bar_all_items)) }
                         ItemDetail(item, states[item.id], onSelect)
-                    } else Sections(cfg.items, states, selected, onSelect, listScroll, desktopView && cfg.floatWithoutBar) { desktopView = it }
+                    } else Sections(cfg.items, states, selected, onSelect, listScroll, desktopView && cfg.floatWithoutBar && cfg.desktopSeparate) { desktopView = it }
                 }
             }
         }
@@ -244,7 +245,7 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
                 if (cfg.position == Position.LEFT) Spacer(Modifier.width(16.dp)) else Spacer(Modifier.weight(1f))
                 Strip(entries(visible), if (expanded) entries(hidden) else emptyList(), hidden.isNotEmpty(),
                     chevronAlways = hidden.isNotEmpty(), chevronReservePx = 0, expanded = expanded,
-                    chevronOnLeft = cfg.position != Position.LEFT, look = look, maxWidthPx = maxPx, heightDp = 52.dp, events = events,
+                    chevronOnLeft = cfg.chevronOnLeft(cfg.position), look = look, maxWidthPx = maxPx, heightDp = 52.dp, events = events,
                     onOverflow = { dropped = it })
                 if (cfg.position == Position.LEFT) Spacer(Modifier.weight(1f)) else if (cfg.position == Position.CENTER) Spacer(Modifier.weight(1f))
                 Spacer(Modifier.width(12.dp))
@@ -298,7 +299,7 @@ private fun Sections(items: List<ItemConfig>, states: Map<String, ItemState>, se
         .pointerHoverIcon(if (reorder.dragging != null) grabbing else PointerIcon.Default, overrideDescendants = reorder.dragging != null)) {
         Column {
             // With Desktop Mode on, the same cards show where each item goes while it is active, and what is put there is saved as that.
-            if (cfg.floatWithoutBar) ChoiceRow(stringResource(R.string.floating_view), listOf(false to stringResource(R.string.floating_view_regular),
+            if (cfg.floatWithoutBar && cfg.desktopSeparate) ChoiceRow(stringResource(R.string.floating_view), listOf(false to stringResource(R.string.floating_view_regular),
                 true to stringResource(R.string.floating_view_desktop)), desktop, help = if (desktop) stringResource(R.string.floating_view_help) else null) { onDesktop(it) }
             SectionCard(Section.SHOWN, stringResource(R.string.section_shown), stringResource(R.string.section_shown_help) + " " + stringResource(R.string.section_shown_popups), order, states, selected, onSelect, reorder, desktop)
             // With everything shown, this section holds the items that wait for their "Show when" rule.
@@ -531,7 +532,7 @@ private fun ItemDetailCard(item: ItemConfig, state: ItemState?, onSelect: (Strin
                 Store.move(item.id, s, 999)
             }
             // With Desktop Mode on, an item can live somewhere else while it is active (no status bar: more room, or less).
-            if (Store.config.collectAsState().value.floatWithoutBar) ChoiceRow(stringResource(R.string.floating_item_where),
+            if (Store.config.collectAsState().value.let { it.floatWithoutBar && it.desktopSeparate }) ChoiceRow(stringResource(R.string.floating_item_where),
                 listOf(DesktopWhere.SAME to stringResource(R.string.floating_where_same), DesktopWhere.SHOWN to stringResource(R.string.section_shown),
                     DesktopWhere.HIDDEN to stringResource(R.string.section_hidden), DesktopWhere.OFF to stringResource(R.string.common_off)),
                 item.desktop, help = stringResource(R.string.floating_item_where_help)) { w ->

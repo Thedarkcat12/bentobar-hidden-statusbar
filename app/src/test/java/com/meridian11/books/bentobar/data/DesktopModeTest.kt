@@ -68,4 +68,15 @@ class DesktopModeTest {
         assertEquals(MAX_OFFSET_Y_DP, BarConfig(desktopOffsetYDp = 500).offsetYNowDp)
         assertEquals(0, BarConfig(desktopOffsetYDp = -9).offsetYNowDp)
     }
+
+    @Test fun theChevronStandsAtTheEndNextToTheMiddleAndAtTheChosenSideWhenCentred() {
+        val c = BarConfig()
+        assertTrue(c.chevronOnLeft(Position.RIGHT))
+        assertFalse(c.chevronOnLeft(Position.LEFT))
+        assertTrue(c.chevronOnLeft(Position.CENTER))
+        assertFalse(c.copy(chevronCenter = ChevronSide.RIGHT).chevronOnLeft(Position.CENTER))
+        // The side chosen for a centred strip changes nothing for the others.
+        assertTrue(c.copy(chevronCenter = ChevronSide.RIGHT).chevronOnLeft(Position.RIGHT))
+        assertFalse(c.copy(chevronCenter = ChevronSide.RIGHT).chevronOnLeft(Position.LEFT))
+    }
 }

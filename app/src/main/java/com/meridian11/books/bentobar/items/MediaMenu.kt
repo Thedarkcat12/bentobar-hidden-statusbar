@@ -105,15 +105,30 @@ internal fun MediaMenu(item: ItemConfig, host: MenuHost) {
         main?.let { MediaText.Controls(it.playing, it.durationMs, it.canPrevious, it.canPlayPause, it.canNext) }, words)
     // The first player, where the menu is about one.
     val player = main?.takeIf { view.player }
-    // "Color from the album art": the controls and the bar take the cover's color, and the popup's glass a little of it.
+    // "Color from the album art": the whole card is drawn in the cover's colors (its accent, a container and a track of its hue,
+    // a surface of its hue under the glass), not the system's Material You ones, which would show on the buttons and the tile.
     val art = MediaItem.popupColor(item)
     val dark = androidx.compose.foundation.isSystemInDarkTheme()
-    val tint = art?.let { androidx.compose.ui.graphics.Color(ArtColor.forBackground(it, dark)) }
-    androidx.compose.runtime.DisposableEffect(art) {
-        com.meridian11.books.bentobar.ui.MenuTint.color.value = art
+    androidx.compose.runtime.DisposableEffect(art, dark) {
+        com.meridian11.books.bentobar.ui.MenuTint.color.value = art?.let { ArtColor.surface(it, dark) }
         onDispose { com.meridian11.books.bentobar.ui.MenuTint.color.value = null }
     }
-    MaterialTheme(colorScheme = if (tint == null) MaterialTheme.colorScheme else MaterialTheme.colorScheme.copy(primary = tint, onPrimary = com.meridian11.books.bentobar.bar.Contrast.readableOn(tint))) {
+    val base = MaterialTheme.colorScheme
+    val scheme = if (art == null) base else {
+        val accent = androidx.compose.ui.graphics.Color(ArtColor.forBackground(art, dark))
+        val container = androidx.compose.ui.graphics.Color(ArtColor.container(art, dark))
+        val track = androidx.compose.ui.graphics.Color(ArtColor.track(art, dark))
+        val onContainer = com.meridian11.books.bentobar.bar.Contrast.readableOn(container)
+        base.copy(
+            primary = accent, onPrimary = com.meridian11.books.bentobar.bar.Contrast.readableOn(accent),
+            primaryContainer = container, onPrimaryContainer = onContainer,
+            secondaryContainer = container, onSecondaryContainer = onContainer,
+            tertiaryContainer = container, onTertiaryContainer = onContainer,
+            surfaceContainerHighest = track, surfaceContainerHigh = container,
+            outlineVariant = accent.copy(alpha = 0.4f),
+        )
+    }
+    MaterialTheme(colorScheme = scheme) {
     MenuCard(Sym.MUSIC_NOTE, stringResource(R.string.item_media_title), view.subtitle) {
         if (player != null && track != null) {
             if (view.track) TrackBlock(player.art, track.title, track.artist, track.album, MediaText.spoken(track, words))
@@ -241,7 +256,7 @@ internal fun PositionBar(session: NowPlaying.Session) {
                     track = {
                         if (wavy) com.meridian11.books.bentobar.ui.WavyTrack(
                             ((it.value - it.valueRange.start) / (it.valueRange.endInclusive - it.valueRange.start)).coerceIn(0f, 1f),
-                            MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.surfaceContainerHighest, Modifier.fillMaxWidth().height(32.dp))
+                            MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.surfaceContainerHighest, Modifier.fillMaxWidth().height(32.dp), playing = session.playing)
                         else SliderDefaults.Track(it, modifier = Modifier.height(6.dp), drawStopIndicator = null, drawTick = { _, _ -> }, thumbTrackGapSize = 0.dp,
                             colors = SliderDefaults.colors(activeTrackColor = MaterialTheme.colorScheme.primary,
                                 inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest))

@@ -63,6 +63,21 @@ object ArtColor {
         return c
     }
 
+    /** A tone of [argb]'s hue: its saturation held to [maxSaturation], at value [v]. */
+    private fun tone(argb: Int, maxSaturation: Float, v: Float): Int {
+        val h = hsv((argb shr 16) and 0xFF, (argb shr 8) and 0xFF, argb and 0xFF)
+        return rgb(h[0], minOf(h[1], maxSaturation), v)
+    }
+
+    /** The cover's hue as a card's surface under the glass: deep on a dark theme, pale on a light one. */
+    fun surface(argb: Int, dark: Boolean): Int = if (dark) tone(argb, 0.55f, 0.20f) else tone(argb, 0.22f, 0.97f)
+
+    /** The cover's hue as the color of the buttons' and the tile's backgrounds: a step from [surface]. */
+    fun container(argb: Int, dark: Boolean): Int = if (dark) tone(argb, 0.55f, 0.34f) else tone(argb, 0.32f, 0.92f)
+
+    /** The cover's hue as the unfilled part of a bar: between the container and the accent. */
+    fun track(argb: Int, dark: Boolean): Int = if (dark) tone(argb, 0.45f, 0.44f) else tone(argb, 0.38f, 0.80f)
+
     /** WCAG relative luminance of an ARGB color. */
     fun luminance(argb: Int): Float {
         fun lin(x: Int): Float { val s = x / 255f; return if (s <= 0.03928f) s / 12.92f else Math.pow(((s + 0.055f) / 1.055f).toDouble(), 2.4).toFloat() }

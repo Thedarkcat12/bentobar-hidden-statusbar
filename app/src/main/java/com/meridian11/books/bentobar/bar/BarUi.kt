@@ -667,13 +667,13 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, gl
         }
         if (progress != null && showIcon) {
             Spacer(Modifier.width(5.dp))
-            ProgressTrack(progress, heldP, look, rtl, com.meridian11.books.bentobar.data.Store.config.collectAsState().value.wavyBars,
+            ProgressTrack(progress, heldP, look, rtl, com.meridian11.books.bentobar.data.Store.config.collectAsState().value.wavyBars, events.slidable,
                 modifier = if (!events.slidable || !progress.seekable) Modifier
                 else Modifier.slides(0, rtl, onHeld = { heldP = it }, onContext = { context() }) { level, done -> events.slide(entry.item, level, done) })
         }
         if (showIcon && (showText || slider != null) && (s.image != null || !s.icon.isNullOrEmpty())) Spacer(Modifier.width(5.dp))
         if (slider != null) {
-            VolumeTrack(slider, held, handle = hovered || held != null, look = look, rtl = rtl,
+            VolumeTrack(slider, held, handle = true, look = look, rtl = rtl,
                 modifier = if (!events.slidable) Modifier
                 else Modifier.slides(slider.steps, rtl, onHeld = { held = it }, onContext = { context() }) { level, done -> events.slide(entry.item, level, done) })
         }
@@ -699,13 +699,15 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, gl
  * under the pointer is drawn. The pointer rules are [slides]'s, on this composable's own zone.
  */
 @Composable
-private fun ProgressTrack(progress: BarProgress, held: Float?, look: StripLook, rtl: Boolean, wavy: Boolean, modifier: Modifier) {
+private fun ProgressTrack(progress: BarProgress, held: Float?, look: StripLook, rtl: Boolean, wavy: Boolean, thumbShown: Boolean, modifier: Modifier) {
     val fg = look.fg
     val onDark = com.meridian11.books.bentobar.items.ArtColor.luminance(fg.toArgb()) > 0.5f
     val fill = if (progress.tint != 0) Color(com.meridian11.books.bentobar.items.ArtColor.forBackground(progress.tint, onDark)) else fg
     Box(modifier.width(SLIDER_TRACK).fillMaxHeight(), contentAlignment = Alignment.Center) {
+        // A track that can be moved shows its handle always, as the pop-ups' do.
         com.meridian11.books.bentobar.ui.WavyTrack(held ?: progress.level, fill, look.sliderTrack,
-            Modifier.fillMaxWidth().height(12.dp).graphicsLayer { scaleX = if (rtl) -1f else 1f }, wavy = wavy)
+            Modifier.fillMaxWidth().height(16.dp).graphicsLayer { scaleX = if (rtl) -1f else 1f }, wavy = wavy,
+            thumb = progress.seekable && thumbShown, thumbColor = look.fg, thumbHeight = 14.dp, playing = progress.playing)
     }
 }
 

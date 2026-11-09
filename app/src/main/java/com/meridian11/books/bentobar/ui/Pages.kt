@@ -53,6 +53,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.meridian11.books.bentobar.BuildConfig
 import com.meridian11.books.bentobar.R
+import com.meridian11.books.bentobar.data.ChevronSide
 import com.meridian11.books.bentobar.data.ChipMode
 import com.meridian11.books.bentobar.data.ColorMode
 import com.meridian11.books.bentobar.data.DesktopAlign
@@ -176,10 +177,16 @@ fun LookPage() {
             Store.update { it.copy(floatWithoutBar = on) }
         }
         if (cfg.floatWithoutBar) {
-            ChoiceRow(stringResource(R.string.floating_align), listOf(DesktopAlign.SAME to stringResource(R.string.floating_align_same),
-                DesktopAlign.RIGHT to stringResource(R.string.floating_align_right), DesktopAlign.CENTER to stringResource(R.string.floating_align_center),
-                DesktopAlign.LEFT to stringResource(R.string.floating_align_left)), cfg.desktopAlign) { v -> Store.update { it.copy(desktopAlign = v) } }
-            SliderRow(stringResource(R.string.floating_offset_desktop), cfg.desktopOffsetYDp, 0..MAX_OFFSET_Y_DP, { "$it dp" }) { v -> Store.update { it.copy(desktopOffsetYDp = v) } }
+            // One layout, or one of its own for Desktop Mode: its alignment, distance from the top and each item's place.
+            SwitchRow(stringResource(R.string.floating_separate), cfg.desktopSeparate, help = stringResource(R.string.floating_separate_help)) { on ->
+                Store.update { it.copy(desktopSeparate = on) }
+            }
+            if (cfg.desktopSeparate) {
+                ChoiceRow(stringResource(R.string.floating_align), listOf(DesktopAlign.SAME to stringResource(R.string.floating_align_same),
+                    DesktopAlign.RIGHT to stringResource(R.string.floating_align_right), DesktopAlign.CENTER to stringResource(R.string.floating_align_center),
+                    DesktopAlign.LEFT to stringResource(R.string.floating_align_left)), cfg.desktopAlign) { v -> Store.update { it.copy(desktopAlign = v) } }
+                SliderRow(stringResource(R.string.floating_offset_desktop), cfg.desktopOffsetYDp, 0..MAX_OFFSET_Y_DP, { "$it dp" }) { v -> Store.update { it.copy(desktopOffsetYDp = v) } }
+            }
             SliderRow(stringResource(R.string.floating_edge), cfg.desktopEdgeDp.coerceIn(0, MAX_EDGE_DP), 0..MAX_EDGE_DP, { "$it dp" }) { v -> Store.update { it.copy(desktopEdgeDp = v) } }
             SwitchRow(stringResource(R.string.floating_hide_max), cfg.desktopHideMaximized, help = stringResource(R.string.floating_hide_max_help)) { on ->
                 Store.update { it.copy(desktopHideMaximized = on) }
@@ -188,8 +195,14 @@ fun LookPage() {
                 Store.update { it.copy(desktopOverlap = on) }
             }
             // Where a window's title bar ends and its buttons begin: the system draws them, so the strip is told how much to leave.
-            if (!cfg.desktopOverlap) SliderRow(stringResource(R.string.floating_title), cfg.floatTitleDp, 0..400, { "$it dp" }) { v -> Store.update { it.copy(floatTitleDp = v) } }
+            // With the strip staying put over titles the left one has no effect: greyed out.
+            SliderRow(stringResource(R.string.floating_title), cfg.floatTitleDp, 0..400, { "$it dp" }, enabled = !cfg.desktopOverlap) { v -> Store.update { it.copy(floatTitleDp = v) } }
             SliderRow(stringResource(R.string.floating_controls), cfg.floatControlsDp, 80..400, { "$it dp" }) { v -> Store.update { it.copy(floatControlsDp = v) } }
+        }
+        // ‹ at a centred strip's left or right end, where it is the regular bar's or Desktop Mode's own.
+        if (cfg.position == Position.CENTER || (cfg.floatWithoutBar && cfg.desktopSeparate && cfg.desktopAlign == DesktopAlign.CENTER)) {
+            ChoiceRow(stringResource(R.string.floating_chevron_side), listOf(ChevronSide.LEFT to stringResource(R.string.floating_chevron_left),
+                ChevronSide.RIGHT to stringResource(R.string.floating_chevron_right)), cfg.chevronCenter) { v -> Store.update { it.copy(chevronCenter = v) } }
         }
         SwitchRow(stringResource(R.string.look_presenting), cfg.presenting, help = stringResource(R.string.look_presenting_help)) { on ->
             Store.update { it.copy(presenting = on) }
@@ -219,10 +232,13 @@ fun LookPage() {
         SwitchRow(stringResource(R.string.look_system_tint), cfg.systemTint, help = stringResource(R.string.look_system_tint_help)) { on ->
             Store.update { it.copy(systemTint = on) }
         }
+        SwitchRow(stringResource(R.string.floating_wheel), cfg.wheelAdjusts, help = stringResource(R.string.floating_wheel_help)) { on -> Store.update { it.copy(wheelAdjusts = on) } }
         PageLabel(stringResource(R.string.barmenu_hidden_items))
         ChoiceRow(stringResource(R.string.look_hidden_mode), listOf(HiddenMode.SHOW_ALL to stringResource(R.string.look_hidden_show_all),
             HiddenMode.CLICK to stringResource(R.string.look_hidden_click), HiddenMode.HOVER to stringResource(R.string.look_hidden_hover)),
             cfg.hiddenMode, help = stringResource(R.string.look_hidden_mode_help)) { v -> Store.update { it.copy(hiddenMode = v) } }
+        if (cfg.hiddenMode != HiddenMode.SHOW_ALL) SwitchRow(stringResource(R.string.floating_reveal_in_place), cfg.revealInPlace,
+            help = stringResource(R.string.floating_reveal_in_place_help)) { on -> Store.update { it.copy(revealInPlace = on) } }
         // Folding back only applies when hidden items wait behind ‹.
         if (cfg.hiddenMode != HiddenMode.SHOW_ALL) ChoiceRow(stringResource(R.string.look_collapse), listOf(0 to stringResource(R.string.look_collapse_never),
             5 to pluralStringResource(R.plurals.look_collapse_after, 5, 5), 10 to pluralStringResource(R.plurals.look_collapse_after, 10, 10),

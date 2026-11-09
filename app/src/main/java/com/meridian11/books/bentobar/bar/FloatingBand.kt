@@ -34,11 +34,20 @@ object FloatingBand {
         system.filter { it.bottom >= screenH - slack && it.right - it.left >= screenW / 2 && it.bottom - it.top in 1..screenH / 4 }.minOfOrNull { it.top }
 
     /**
-     * True when a window spans the screen's width from its top edge down to [floorY] (the taskbar's top, or the
-     * display's bottom with none): maximized, as against full screen, which has no taskbar either.
+     * The windows that fill the screen from its top edge: across its width (give or take [slack] pixels, since a window's
+     * bounds can fall short) and down most of its height (a window under the taskbar, or ending at it, both count).
+     * Maximized apps do, and so does the desktop itself, which is the lowest of them. [windows] keep their order.
      */
-    fun isMaximized(windows: List<AppWindow>, screenW: Int, floorY: Int, slack: Int = 2): Boolean =
-        windows.any { it.left <= slack && it.right >= screenW - slack && it.top <= slack && it.bottom >= floorY - slack }
+    fun fills(windows: List<AppWindow>, screenW: Int, screenH: Int, slack: Int = 12): List<AppWindow> =
+        windows.filter { it.left <= slack && it.right >= screenW - slack && it.top <= slack && it.bottom >= screenH * 7 / 10 }
+
+    /**
+     * The maximized app among [fills], top-most first: an app has no caption of its own to sit in then, so its own top bar
+     * lies under the strip. The desktop fills the screen as well; with two or more, the top one is an app (the desktop is
+     * under it), and a lone one is an app only when [isDesktop] says it is not the desktop.
+     */
+    fun maximizedApp(fills: List<AppWindow>, isDesktop: (AppWindow) -> Boolean): AppWindow? =
+        if (fills.size >= 2) fills.first() else fills.singleOrNull()?.takeIf { !isDesktop(it) }
 
     /**
      * True when an app window covers the whole display: a full-screen app has no caption and no
@@ -62,8 +71,9 @@ object FloatingBand {
             if (w.top >= bandBottom || w.bottom <= bandTop || w.right - w.left < minWidth) continue
             val left = w.left.coerceIn(0, screenW)
             val right = w.right.coerceIn(0, screenW)
-            taken += left to minOf(right, left + title)
-            taken += maxOf(left, right - controls) to right
+            // A reserve of nothing is no stretch at all: as a zero-width span it would still cut a free stretch in two.
+            if (title > 0) taken += left to minOf(right, left + title)
+            if (controls > 0) taken += maxOf(left, right - controls) to right
         }
         val out = ArrayList<Free>()
         var cursor = edge
